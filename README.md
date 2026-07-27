@@ -13,7 +13,8 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 5. [Infrastructure Details](#infrastructure-details)
 6. [Managing Resources](#managing-resources)
 7. [Test Results](#test-results)
-8. [Troubleshooting](#troubleshooting)
+8. [Cleanup & Fresh Start](#cleanup--fresh-start)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -415,6 +416,62 @@ terraform destroy
 
 ---
 
+## 🧹 Cleanup & Fresh Start
+
+### After Testing is Complete
+
+To clean up from a previous test and prepare for a new one:
+
+**Option 1: Use cleanup script**
+
+Windows (PowerShell):
+```powershell
+.\cleanup.ps1
+```
+
+Linux/Mac (Bash):
+```bash
+bash cleanup.sh
+```
+
+**Option 2: Manual cleanup**
+
+```bash
+# Destroy infrastructure
+cd terraform
+terraform destroy
+
+# Remove test results
+rm -f Results/test-*.md Results/execution-log.txt
+
+# Reset terraform config
+rm terraform/terraform.tfvars
+cp terraform.tfvars.example terraform/terraform.tfvars
+```
+
+**Option 3: Simple prompt to Claude**
+
+Just say: `cleanup test`
+
+Claude will automatically clean up and prepare for the next test run.
+
+### What Gets Cleaned
+
+- ✅ AWS infrastructure (EC2 instances, security groups, VPC resources)
+- ✅ Previous test results (implementation steps, verdict, details, logs)
+- ✅ Terraform state files
+- ✅ Terraform cache and lock files
+- ✅ User configuration (terraform.tfvars)
+
+### What Stays
+
+- ✅ All templates and documentation
+- ✅ Terraform code (main.tf, variables.tf, outputs.tf)
+- ✅ Installation scripts
+- ✅ Test instructions
+
+---
+
 ## 🐛 Troubleshooting
 
 ### Infrastructure Deployment Fails
@@ -512,10 +569,11 @@ terraform refresh
 | Need | How |
 |------|-----|
 | **Start automated test** | Say "execute test" to Claude |
+| **Clean up & start fresh** | Say "cleanup test" to Claude, or run `./cleanup.ps1` / `bash cleanup.sh` |
 | **SSH to server** | `ssh -i wazuh-test-key.pem ubuntu@<dns>` |
 | **View dashboard** | `https://<server-dns>` |
 | **Extend TTL** | Edit `terraform/terraform.tfvars` → `terraform apply` |
-| **Cleanup** | `cd terraform && terraform destroy` |
+| **Manually destroy** | `cd terraform && terraform destroy` |
 | **View test verdict** | `cat Results/test-verdict.md` |
 | **View test details** | `cat Results/test-details.md` |
 | **View timeline** | `cat Results/execution-log.txt` |

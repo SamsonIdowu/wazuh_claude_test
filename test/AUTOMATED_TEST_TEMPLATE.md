@@ -12,6 +12,37 @@ This file serves as a self-executing test automation guide. When you say "execut
 
 ---
 
+## 🧹 Clean Up Previous Test Run
+
+If you're running a new test and want to clean up from a previous test run, use this prompt:
+
+```
+cleanup test
+```
+
+This will automatically:
+- Destroy all AWS infrastructure (terraform destroy)
+- Remove previous test results from Results/
+- Reset terraform/terraform.tfvars (removing test-specific variables)
+- Keep test templates and documentation intact
+- Ready the repository for a fresh test
+
+**Or manually clean up:**
+```bash
+# Destroy infrastructure
+cd terraform
+terraform destroy
+
+# Remove previous test results
+rm -f Results/test-*.md Results/execution-log.txt
+
+# Reset terraform config (use example)
+rm terraform/terraform.tfvars
+cp terraform.tfvars.example terraform/terraform.tfvars
+```
+
+---
+
 ## Configuration
 
 ### Google Drive Document Link
