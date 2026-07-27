@@ -62,8 +62,8 @@ if [ -f "terraform/terraform.tfvars" ]; then
     echo "✅ Removed: terraform/terraform.tfvars"
 fi
 
-if [ -f "terraform.tfvars.example" ]; then
-    cp "terraform.tfvars.example" "terraform/terraform.tfvars"
+if [ -f "terraform/terraform.tfvars.example" ]; then
+    cp "terraform/terraform.tfvars.example" "terraform/terraform.tfvars"
     echo "✅ Reset: Created fresh terraform/terraform.tfvars from example"
 fi
 

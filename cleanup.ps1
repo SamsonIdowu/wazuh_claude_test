@@ -58,8 +58,8 @@ if (Test-Path "terraform/terraform.tfvars") {
     Write-Host "✅ Removed: terraform/terraform.tfvars"
 }
 
-if (Test-Path "terraform.tfvars.example") {
-    Copy-Item "terraform.tfvars.example" "terraform/terraform.tfvars"
+if (Test-Path "terraform/terraform.tfvars.example") {
+    Copy-Item "terraform/terraform.tfvars.example" "terraform/terraform.tfvars"
     Write-Host "✅ Reset: Created fresh terraform/terraform.tfvars from example"
 }
 

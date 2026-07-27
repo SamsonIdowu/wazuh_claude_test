@@ -43,17 +43,20 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 ```
 wazuh_test/
 ├── README.md                           (This file - main documentation)
-├── setup.ps1 / setup.sh               (Auto-detect IP, create terraform.tfvars)
+├── cleanup.ps1 / cleanup.sh           (Cleanup scripts)
+├── .gitignore / .gitattributes        (Git configuration)
 ├── terraform/
 │   ├── main.tf                        (EC2, security groups, networking)
 │   ├── variables.tf                   (Configurable parameters)
 │   ├── outputs.tf                     (Connection details)
 │   ├── wazuh-server-init.sh          (Server installation)
 │   ├── wazuh-agent-init.sh           (Agent installation)
-│   └── terraform.tfvars               (Your config - create this)
+│   ├── terraform.tfvars.example       (Config template - copy this)
+│   └── terraform.tfvars               (Your config - create from example)
 ├── test/
 │   ├── AUTOMATED_TEST_TEMPLATE.md    (Self-executing test template)
 │   ├── EXECUTE_TEST_GUIDE.txt        (Quick start for automated tests)
+│   ├── README.md                     (Test documentation)
 │   ├── TTL_AND_AUTO_TERMINATION.md   (TTL management guide)
 │   └── TTL_SUMMARY.txt               (Quick reference)
 └── Results/                           (Test outputs - auto-generated)
@@ -159,23 +162,16 @@ This allows testing any Wazuh configuration without modifying test procedures.
 - SSH client
 - Your public IP address
 
-### Step 1: Auto-Detect Your IP (Optional)
+### Step 1: Create Terraform Configuration
 
-**On Windows:**
-```powershell
-.\setup.ps1
-```
+Copy the example configuration:
 
-**On Linux/Mac:**
 ```bash
-bash setup.sh
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
 ```
 
-This creates `terraform/terraform.tfvars` with your detected IP in security group CIDR blocks.
-
-### Step 2: Create Terraform Configuration
-
-If not using setup script, create `terraform/terraform.tfvars`:
+Then edit `terraform/terraform.tfvars`:
 
 ```hcl
 aws_region                  = "us-east-1"
@@ -188,7 +184,7 @@ resource_ttl_minutes       = 60          # 1 hour default
 enable_auto_termination    = true        # Auto-cleanup enabled
 ```
 
-### Step 3: Deploy
+### Step 2: Deploy
 
 ```bash
 cd terraform
@@ -204,7 +200,7 @@ Terraform will output:
 - Dashboard URL
 - TTL countdown
 
-### Step 4: Access Resources
+### Step 3: Access Resources
 
 **SSH to Wazuh Server:**
 ```bash
@@ -223,7 +219,7 @@ Password: admin (default)
 ssh -i wazuh-test-key.pem ubuntu@<agent_public_dns>
 ```
 
-### Step 5: Verify Services
+### Step 4: Verify Services
 
 ```bash
 # On Wazuh server:
@@ -235,7 +231,7 @@ sudo systemctl status wazuh-indexer
 sudo tail -50 /var/ossec/logs/ossec.log
 ```
 
-### Step 6: Run Tests
+### Step 5: Run Tests
 
 Follow your test procedures from the blog post:
 1. Deploy EOL detector script
@@ -244,7 +240,7 @@ Follow your test procedures from the blog post:
 4. Generate test data
 5. Verify alerts in dashboard
 
-### Step 7: Document Results
+### Step 6: Document Results
 
 Create test result files in `Results/`:
 - `test-implementation-steps.md` - What you tested
@@ -446,7 +442,7 @@ rm -f Results/test-*.md Results/execution-log.txt
 
 # Reset terraform config
 rm terraform/terraform.tfvars
-cp terraform.tfvars.example terraform/terraform.tfvars
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
 **Option 3: Simple prompt to Claude**
