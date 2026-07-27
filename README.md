@@ -29,12 +29,13 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 5. Wait 20-40 minutes
 6. Check `Results/` folder for test outputs
 
-### Option 2: Manual Infrastructure + Tests
+### Option 2: Manual Deployment
 
-1. Create `terraform/terraform.tfvars` with your AWS credentials and IP
-2. Run `terraform init && terraform apply`
-3. SSH to instances and manually run tests
-4. Document results
+1. Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars`
+2. Edit with your AWS credentials and IP address
+3. Run `cd terraform && terraform init && terraform apply`
+4. SSH to instances and manually run tests
+5. Document results in `Results/` folder
 
 ---
 
@@ -56,7 +57,7 @@ wazuh_test/
 ├── test/
 │   ├── AUTOMATED_TEST_TEMPLATE.md    (Self-executing test template)
 │   ├── EXECUTE_TEST_GUIDE.txt        (Quick start for automated tests)
-│   ├── README.md                     (Test documentation)
+│   ├── README.md                     (Test documentation index)
 │   ├── TTL_AND_AUTO_TERMINATION.md   (TTL management guide)
 │   └── TTL_SUMMARY.txt               (Quick reference)
 └── Results/                           (Test outputs - auto-generated)
@@ -70,43 +71,39 @@ wazuh_test/
 
 ## 🤖 Automated Testing
 
-The automated test system dynamically adapts infrastructure to match your document requirements.
+The automated test system dynamically adapts infrastructure to match your document requirements while keeping test procedures constant.
 
-### How It Works
+### How It Works: 6 Automated Phases
 
-**6 Automated Phases:**
+**Phase 1: Document Analysis (5 min)**
+- Reads your Google Drive document
+- Extracts infrastructure requirements (instance types, OS, versions, storage)
+- Identifies test implementation steps
 
-1. **Document Analysis (5 min)**
-   - Reads your Google Drive document
-   - Extracts infrastructure requirements
-   - Identifies test implementation steps
+**Phase 2: Test Planning & Infrastructure Analysis (10 min)**
+- Generates `terraform/terraform.tfvars` from document requirements
+- Creates `Results/test-implementation-steps.md` with test procedures
+- Plans resource configuration
 
-2. **Test Planning & Infrastructure Analysis (10 min)**
-   - Identifies instance types, OS versions, component versions
-   - Generates `terraform/terraform.tfvars` from requirements
-   - Updates terraform variables if needed
-   - Creates `Results/test-implementation-steps.md`
+**Phase 3: Infrastructure Setup (10 min)**
+- Executes `terraform init && terraform plan && terraform apply`
+- Waits 5-10 minutes for services to initialize
 
-3. **Infrastructure Setup (10 min)**
-   - Runs `setup.ps1` for IP auto-detection
-   - Executes `terraform init && terraform plan && terraform apply`
-   - Waits 5-10 minutes for services to initialize
+**Phase 4: Test Execution (10-15 min)**
+- SSH to Wazuh server
+- Deploys configurations from document
+- Executes test steps sequentially
+- Captures all outputs
 
-4. **Test Execution (10-15 min)**
-   - SSH to Wazuh server
-   - Deploys configurations from document
-   - Executes test steps sequentially
-   - Captures all outputs
+**Phase 5: Results & Verdict (5 min)**
+- Creates `Results/test-verdict.md` (PASS/FAIL/PARTIAL)
+- Creates `Results/test-details.md` (detailed findings)
+- Generates `Results/execution-log.txt` (timeline)
 
-5. **Results & Verdict (5 min)**
-   - Creates `Results/test-verdict.md` (PASS/FAIL/PARTIAL)
-   - Creates `Results/test-details.md` (findings)
-   - Generates `Results/execution-log.txt` (timeline)
-
-6. **Cleanup (auto-managed)**
-   - Auto-terminates after 1 hour (default)
-   - Or extend TTL in `terraform/terraform.tfvars`
-   - Or manual `terraform destroy`
+**Phase 6: Cleanup (auto-managed)**
+- Auto-terminates after 1 hour (default)
+- Or extend TTL in `terraform/terraform.tfvars`
+- Or manual `terraform destroy`
 
 ### Timeline Example
 
@@ -120,36 +117,34 @@ The automated test system dynamically adapts infrastructure to match your docume
 10:45 AM - Results available in Results/ folder
 ```
 
-### Variable Infrastructure, Constant Tests
+### Key Architecture: Variable Infrastructure, Constant Tests
 
-**Architecture Design:**
-- Infrastructure (instance types, OS, versions, storage) is **variable** based on your document
-- Test procedures, SSH commands, and execution flow are **constant**
-- Results show exactly what infrastructure was used and tested
+- **Infrastructure** (instance types, OS, versions, storage) adapts to your document requirements
+- **Test procedures** (SSH commands, service checks, test flow) remain standardized
+- **Results** clearly show what was deployed and tested
 
-This allows testing any Wazuh configuration without modifying test procedures.
+This design allows testing any Wazuh configuration without modifying test procedures.
 
-### To Use Automated Testing
+### How to Use Automated Testing
 
-1. **Update Template:**
-   ```bash
-   # Edit test/AUTOMATED_TEST_TEMPLATE.md
-   # Add your Google Drive document link in the Configuration section
-   # Save the file
-   ```
+**Step 1: Update Template**
+```bash
+# Edit test/AUTOMATED_TEST_TEMPLATE.md
+# Add your Google Drive document link in the Configuration section
+# Save the file
+```
 
-2. **Execute:**
-   ```
-   Message Claude: "execute test"
-   ```
+**Step 2: Execute**
+```
+Message Claude: "execute test"
+```
 
-3. **View Results:**
-   ```bash
-   # After 20-40 minutes, check:
-   cat Results/test-verdict.md        # Pass/Fail summary
-   cat Results/test-details.md        # Full findings
-   cat Results/execution-log.txt      # Timeline
-   ```
+**Step 3: View Results** (after 20-40 minutes)
+```bash
+cat Results/test-verdict.md        # Pass/Fail summary
+cat Results/test-details.md        # Full findings
+cat Results/execution-log.txt      # Timeline
+```
 
 ---
 
@@ -160,18 +155,16 @@ This allows testing any Wazuh configuration without modifying test procedures.
 - AWS account with credentials configured locally
 - Terraform installed (v1.0+)
 - SSH client
-- Your public IP address
+- Your public IP address (for security group configuration)
 
 ### Step 1: Create Terraform Configuration
-
-Copy the example configuration:
 
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Then edit `terraform/terraform.tfvars`:
+Edit `terraform/terraform.tfvars`:
 
 ```hcl
 aws_region                  = "us-east-1"
@@ -184,7 +177,7 @@ resource_ttl_minutes       = 60          # 1 hour default
 enable_auto_termination    = true        # Auto-cleanup enabled
 ```
 
-### Step 2: Deploy
+### Step 2: Deploy Infrastructure
 
 ```bash
 cd terraform
@@ -193,10 +186,10 @@ terraform plan
 terraform apply
 ```
 
-Terraform will output:
+Terraform outputs:
 - Wazuh server public DNS
 - Wazuh agent public DNS
-- SSH key path
+- SSH key path (`wazuh-test-key.pem`)
 - Dashboard URL
 - TTL countdown
 
@@ -222,7 +215,7 @@ ssh -i wazuh-test-key.pem ubuntu@<agent_public_dns>
 ### Step 4: Verify Services
 
 ```bash
-# On Wazuh server:
+# SSH to server first, then:
 sudo systemctl status wazuh-manager
 sudo systemctl status wazuh-dashboard
 sudo systemctl status wazuh-indexer
@@ -243,41 +236,41 @@ Follow your test procedures from the blog post:
 ### Step 6: Document Results
 
 Create test result files in `Results/`:
-- `test-implementation-steps.md` - What you tested
-- `test-verdict.md` - PASS/FAIL/PARTIAL summary
-- `test-details.md` - Detailed findings
+- `test-implementation-steps.md` — What you tested
+- `test-verdict.md` — PASS/FAIL/PARTIAL summary
+- `test-details.md` — Detailed findings
 
 ---
 
 ## 🏗️ Infrastructure Details
 
-### Deployed Components
+### Wazuh Server (Ubuntu 22.04)
 
-**Wazuh Server (Ubuntu 22.04)**
-- Instance Type: `t3.xlarge` (customizable)
-- Root Volume: 30 GB (gp3, encrypted)
-- Services:
+- **Instance Type:** `t3.xlarge` (customizable)
+- **Root Volume:** 30 GB (gp3, encrypted)
+- **Services:**
   - Wazuh Manager 4.14.6
   - Wazuh Dashboard 4.14.6
   - Wazuh Indexer 4.14.6
-- Cost: ~$0.17/hour
-- Security Group:
-  - SSH (22) from your IP
-  - Dashboard (443) from anywhere
-  - API (55000) from your IP
-  - Agent comms (1514) from anywhere
+- **Cost:** ~$0.17/hour
+- **Security Group Ports:**
+  - SSH (22) — from your IP
+  - Dashboard (443) — from anywhere
+  - API (55000) — from your IP
+  - Agent comms (1514) — from anywhere
 
-**Wazuh Agent (Ubuntu 24.04)**
-- Instance Type: `t3.medium` (customizable)
-- Root Volume: 20 GB (gp3, encrypted)
-- Services:
-  - Wazuh Agent 4.14.6 (auto-enrolled)
-- Cost: ~$0.04/hour
-- Security Group:
-  - SSH (22) from your IP
-  - Agent comms (1514) from Wazuh server only
+### Wazuh Agent (Ubuntu 24.04)
 
-### Single Version Variable
+- **Instance Type:** `t3.medium` (customizable)
+- **Root Volume:** 20 GB (gp3, encrypted)
+- **Services:**
+  - Wazuh Agent 4.14.6 (auto-enrolled to server)
+- **Cost:** ~$0.04/hour
+- **Security Group Ports:**
+  - SSH (22) — from your IP
+  - Agent comms (1514) — from Wazuh server only
+
+### Single Version Control
 
 Change Wazuh version for all components with one variable:
 
@@ -287,11 +280,11 @@ wazuh_version = "4.14.6"  # Updates Manager, Dashboard, Indexer, Agent
 
 ### Security Features
 
-- **Auto-detected IP:** Setup scripts detect your public IP automatically
 - **Encrypted volumes:** Root volumes use gp3 with encryption enabled
 - **IMDSv2 enforced:** Instance metadata requires secure tokens
-- **Restricted SSH:** SSH restricted to your IP by default
-- **Public dashboard:** Dashboard accessible from internet (not manager)
+- **Restricted SSH:** SSH access limited to your IP by default
+- **Public dashboard:** Dashboard accessible from internet (manager is not)
+- **Security groups:** Restrictive ingress rules, unrestricted egress
 
 ---
 
@@ -299,7 +292,7 @@ wazuh_version = "4.14.6"  # Updates Manager, Dashboard, Indexer, Agent
 
 ### TTL (Time-To-Live)
 
-Default: **1 hour** with auto-termination
+**Default:** 1 hour with auto-termination
 
 ### Extend TTL
 
@@ -308,7 +301,7 @@ Edit `terraform/terraform.tfvars`:
 resource_ttl_minutes = 120  # 2 hours
 ```
 
-Then:
+Then apply:
 ```bash
 cd terraform
 terraform apply
@@ -321,13 +314,13 @@ Edit `terraform/terraform.tfvars`:
 enable_auto_termination = false
 ```
 
-Then:
+Then apply:
 ```bash
 cd terraform
 terraform apply
 ```
 
-### Cleanup
+### Manually Cleanup
 
 Immediately terminate resources:
 ```bash
@@ -337,19 +330,19 @@ terraform destroy
 
 ### Cost Estimates
 
-| Duration | Monthly Cost | Test Cost |
-|----------|--------------|-----------|
-| 1 hour | N/A | ~$0.21 |
-| 2 hours | N/A | ~$0.42 |
-| 4 hours | N/A | ~$0.84 |
-| 8 hours | N/A | ~$1.68 |
-| Full day (24h) | N/A | ~$5.04 |
+| Duration | Test Cost |
+|----------|-----------|
+| 1 hour | ~$0.21 |
+| 2 hours | ~$0.42 |
+| 4 hours | ~$0.84 |
+| 8 hours | ~$1.68 |
+| 24 hours | ~$5.04 |
 
 ---
 
 ## 📊 Test Results
 
-### Output Files (in Results/ Directory)
+Test results are stored in the `Results/` directory with these files:
 
 **test-implementation-steps.md**
 - What was tested
@@ -372,8 +365,7 @@ terraform destroy
 **execution-log.txt**
 - Timeline of all events
 - Phase completion times
-- Resource URLs
-- Connection details
+- Resource URLs and connection details
 - Service status at each step
 
 ---
@@ -384,8 +376,8 @@ terraform destroy
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `aws_region` | string | us-east-1 | AWS region |
-| `wazuh_version` | string | 4.14.6 | Wazuh version (affects all components) |
+| `aws_region` | string | us-east-1 | AWS region for deployment |
+| `wazuh_version` | string | 4.14.6 | Wazuh version (all components) |
 
 ### Instance Configuration
 
@@ -400,37 +392,42 @@ terraform destroy
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `allowed_ssh_cidrs` | list | 0.0.0.0/0 | CIDR blocks for SSH |
-| `allowed_api_cidrs` | list | 0.0.0.0/0 | CIDR blocks for API |
+| `allowed_ssh_cidrs` | list | 0.0.0.0/0 | CIDR blocks for SSH access |
+| `allowed_api_cidrs` | list | 0.0.0.0/0 | CIDR blocks for API access |
 
 ### TTL Configuration
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `resource_ttl_minutes` | number | 60 | Auto-termination timeout (1-1440 min) |
-| `enable_auto_termination` | bool | true | Enable auto-cleanup |
+| `resource_ttl_minutes` | number | 60 | Auto-termination timeout (1-1440 minutes) |
+| `enable_auto_termination` | bool | true | Enable automatic resource cleanup |
 
 ---
 
 ## 🧹 Cleanup & Fresh Start
 
-### After Testing is Complete
-
 To clean up from a previous test and prepare for a new one:
 
-**Option 1: Use cleanup script**
+### Option 1: Use Cleanup Script (Recommended)
 
-Windows (PowerShell):
+**Windows (PowerShell):**
 ```powershell
 .\cleanup.ps1
 ```
 
-Linux/Mac (Bash):
+**Linux/Mac (Bash):**
 ```bash
 bash cleanup.sh
 ```
 
-**Option 2: Manual cleanup**
+The script will:
+- Destroy all AWS infrastructure
+- Remove previous test results
+- Reset terraform configuration
+- Clear terraform cache and state files
+- Preserve all templates and documentation
+
+### Option 2: Manual Cleanup
 
 ```bash
 # Destroy infrastructure
@@ -445,26 +442,25 @@ rm terraform/terraform.tfvars
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-**Option 3: Simple prompt to Claude**
+### Option 3: Simple Prompt to Claude
 
 Just say: `cleanup test`
 
-Claude will automatically clean up and prepare for the next test run.
+Claude will automatically clean up everything and prepare for the next test run.
 
-### What Gets Cleaned
+### What Gets Cleaned vs What Stays
 
-- ✅ AWS infrastructure (EC2 instances, security groups, VPC resources)
-- ✅ Previous test results (implementation steps, verdict, details, logs)
-- ✅ Terraform state files
-- ✅ Terraform cache and lock files
-- ✅ User configuration (terraform.tfvars)
+**Cleaned:**
+- AWS infrastructure (EC2 instances, security groups, VPC resources)
+- Previous test results (implementation steps, verdict, details, logs)
+- Terraform state files and cache
+- User configuration (terraform.tfvars)
 
-### What Stays
-
-- ✅ All templates and documentation
-- ✅ Terraform code (main.tf, variables.tf, outputs.tf)
-- ✅ Installation scripts
-- ✅ Test instructions
+**Stays:**
+- All templates and documentation
+- Terraform infrastructure code
+- Installation scripts
+- Test instructions
 
 ---
 
@@ -487,8 +483,8 @@ aws ec2 describe-vpcs --region us-east-1
 ### SSH Connection Fails
 
 ```bash
-# Verify key permissions
-ls -la wazuh-test-key.pem  # Should be 600
+# Verify key permissions (should be 600)
+ls -la wazuh-test-key.pem
 
 # Check security group
 aws ec2 describe-security-groups --group-names wazuh-server-sg
@@ -500,7 +496,7 @@ aws ec2 describe-instance-status --instance-ids <instance-id>
 ### Wazuh Services Not Running
 
 ```bash
-# SSH to server
+# SSH to server first
 ssh -i wazuh-test-key.pem ubuntu@<server-dns>
 
 # Check services
@@ -510,7 +506,7 @@ sudo systemctl status wazuh-dashboard
 # View logs
 sudo tail -100 /var/ossec/logs/ossec.log
 
-# Restart if needed
+# Restart service if needed
 sudo systemctl restart wazuh-manager
 ```
 
@@ -565,70 +561,31 @@ terraform refresh
 | Need | How |
 |------|-----|
 | **Start automated test** | Say "execute test" to Claude |
-| **Clean up & start fresh** | Say "cleanup test" to Claude, or run `./cleanup.ps1` / `bash cleanup.sh` |
+| **Clean up & start fresh** | Say "cleanup test" or run `./cleanup.ps1` / `bash cleanup.sh` |
 | **SSH to server** | `ssh -i wazuh-test-key.pem ubuntu@<dns>` |
-| **View dashboard** | `https://<server-dns>` |
+| **Access dashboard** | `https://<server-dns>` (admin/admin) |
 | **Extend TTL** | Edit `terraform/terraform.tfvars` → `terraform apply` |
-| **Manually destroy** | `cd terraform && terraform destroy` |
+| **Destroy infrastructure** | `cd terraform && terraform destroy` |
 | **View test verdict** | `cat Results/test-verdict.md` |
 | **View test details** | `cat Results/test-details.md` |
-| **View timeline** | `cat Results/execution-log.txt` |
+| **View execution log** | `cat Results/execution-log.txt` |
 
 ---
 
 ## 📚 Documentation Files
 
-- **test/AUTOMATED_TEST_TEMPLATE.md** — Self-executing test template with Google Drive link
+- **test/AUTOMATED_TEST_TEMPLATE.md** — Self-executing test template (edit to add Google Drive link)
 - **test/EXECUTE_TEST_GUIDE.txt** — Quick start guide for automated testing
-- **test/TTL_AND_AUTO_TERMINATION.md** — Complete TTL management guide
-- **test/TTL_SUMMARY.txt** — Quick reference for TTL features
+- **test/TTL_AND_AUTO_TERMINATION.md** — Complete Time-To-Live management guide
+- **test/TTL_SUMMARY.txt** — Quick reference card for TTL features
 
 ---
 
 ## 🔗 References
 
-- **Blog Post:** Monitoring end-of-life software with Wazuh
 - **Wazuh Documentation:** https://documentation.wazuh.com/current/
 - **EndOfLife.date API:** https://endoflife.date/
 - **Terraform AWS Provider:** https://registry.terraform.io/providers/hashicorp/aws/latest/docs
-
----
-
-## 📝 Architecture Notes
-
-### Variable Infrastructure, Constant Tests
-
-- **Infrastructure** (instance types, OS, versions, storage) is determined from document requirements
-- **Test procedures** (SSH commands, service checks, test flow) remain standardized
-- **Results** clearly show what infrastructure was deployed and tested
-
-### Why This Design?
-
-This architecture allows you to test any Wazuh configuration without modifying test procedures. Each test extracts infrastructure requirements from a document and automatically configures terraform accordingly.
-
----
-
-## 🎯 Workflow
-
-```
-Google Drive Document (with requirements)
-         ↓
-   Step 1: Upload Google Drive link to test/AUTOMATED_TEST_TEMPLATE.md
-         ↓
-   Step 2: Say "execute test" to Claude
-         ↓
-   Step 3: Claude automatically:
-      - Reads document
-      - Extracts requirements
-      - Generates terraform.tfvars
-      - Deploys infrastructure
-      - Runs tests
-      - Documents results
-         ↓
-   Step 4: Review results in Results/ folder
-         ↓
-   Step 5: Resources auto-terminate after 1 hour (or manually cleanup)
-```
 
 ---
 
