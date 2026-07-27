@@ -1,0 +1,71 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl
+
+# SSH Keys
+*.pem
+*.pub
+wazuh-test-key*
+!*.pem.example
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+tfplan
+
+# Test outputs (results are committed but logs aren't)
+Results/*.log
+Results/execution-log.txt
+
+# Local configuration
+.env
+.env.local
+*.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# AWS credentials
+.aws/credentials
+.aws/config
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Node modules (if any)
+node_modules/
+
+# Compiled outputs (if any)
+dist/
+build/
+
+# macOS
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+$RECYCLE.BIN/
+ehthumbs.db

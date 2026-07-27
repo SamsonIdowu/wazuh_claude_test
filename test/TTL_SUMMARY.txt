@@ -1,0 +1,151 @@
+═══════════════════════════════════════════════════════════════════════
+    WAZUH TEST INFRASTRUCTURE - AUTO-TERMINATION FEATURE SUMMARY
+═══════════════════════════════════════════════════════════════════════
+
+✅ FEATURE: 1-Hour Default TTL with Automatic Cleanup
+
+═══════════════════════════════════════════════════════════════════════
+
+⏱️  DEFAULT BEHAVIOR:
+
+  Deploy → 1 Hour Passes → Auto-Terminate (unless you extend/disable)
+
+═══════════════════════════════════════════════════════════════════════
+
+🔧 TERRAFORM VARIABLES ADDED:
+
+  1. resource_ttl_minutes (default: 60)
+     - Controls how long resources live
+     - Range: 1-1440 minutes (1 minute to 1 day)
+     - Change to extend: 120, 180, 240, etc.
+
+  2. enable_auto_termination (default: true)
+     - Enable/disable auto-cleanup
+     - Set to 'false' to keep resources running forever
+
+═══════════════════════════════════════════════════════════════════════
+
+📝 FILE LOCATIONS:
+
+  terraform/terraform.tfvars
+  └─ Contains: resource_ttl_minutes = 60
+              enable_auto_termination = true
+
+  terraform/main.tf
+  └─ Contains: Instance tags with TTL metadata
+
+  TTL_AND_AUTO_TERMINATION.md
+  └─ Complete documentation for TTL management
+
+═══════════════════════════════════════════════════════════════════════
+
+🚀 EXTENDING TTL (IF YOU NEED MORE TIME):
+
+  Step 1: Edit terraform/terraform.tfvars
+  
+    Change:  resource_ttl_minutes = 60
+    To:      resource_ttl_minutes = 120  (for 2 hours)
+             resource_ttl_minutes = 180  (for 3 hours)
+             etc.
+
+  Step 2: Apply changes
+  
+    cd terraform
+    terraform apply
+
+  Step 3: Resources continue for the new duration
+
+═══════════════════════════════════════════════════════════════════════
+
+❌ DISABLING AUTO-TERMINATION (IF YOU WANT RESOURCES TO STAY):
+
+  Step 1: Edit terraform/terraform.tfvars
+
+    Change:  enable_auto_termination = true
+    To:      enable_auto_termination = false
+
+  Step 2: Apply changes
+
+    cd terraform
+    terraform apply
+
+  Step 3: Resources won't auto-terminate (manual destroy required)
+
+═══════════════════════════════════════════════════════════════════════
+
+💥 MANUAL CLEANUP (IF YOU'RE DONE EARLY):
+
+  cd terraform
+  terraform destroy
+
+═══════════════════════════════════════════════════════════════════════
+
+📊 WHAT GETS TRACKED:
+
+  Instance Tags:
+  ✓ TTL_Minutes (your configured TTL)
+  ✓ AutoTermination (true/false)
+  ✓ CreatedAt (timestamp)
+
+  Output Info:
+  ✓ resource_ttl_minutes (current value)
+  ✓ auto_termination_enabled (current status)
+  ✓ ttl_extension_instructions (quick reference)
+
+═══════════════════════════════════════════════════════════════════════
+
+🔐 SAFETY FEATURES:
+
+  ✅ Terraform validates TTL range (1-1440 minutes)
+  ✅ Info file created with instructions (TTL_AND_EXTENSION.txt)
+  ✅ Instance tags prevent accidental long-running deployments
+  ✅ Clear output messages on each terraform apply
+  ✅ You always have manual control via terraform destroy
+
+═══════════════════════════════════════════════════════════════════════
+
+💰 COST IMPACT (1-HOUR DEFAULT):
+
+  Wazuh Server (t3.xlarge):     ~$0.17
+  Agent (t3.medium):            ~$0.04
+  Storage:                       <$0.01
+  ────────────────────────────
+  Total per 1-hour run:          ~$0.22
+
+  Extending to 2 hours:          ~$0.44
+  Extending to 4 hours:          ~$0.88
+
+═══════════════════════════════════════════════════════════════════════
+
+📋 QUICK REFERENCE:
+
+  View TTL status:
+    terraform output resource_ttl_minutes
+    terraform output auto_termination_enabled
+
+  Extend TTL:
+    1. Edit terraform/terraform.tfvars
+    2. Change resource_ttl_minutes = 120
+    3. Run: terraform apply
+
+  Disable auto-termination:
+    1. Edit terraform/terraform.tfvars
+    2. Change enable_auto_termination = false
+    3. Run: terraform apply
+
+  Destroy immediately:
+    terraform destroy
+
+═══════════════════════════════════════════════════════════════════════
+
+✨ WORKFLOW:
+
+  Deploy:    terraform apply (TTL starts counting: 60 min)
+  Work:      Run your tests (30 min, no action needed)
+  Extend:    Edit .tfvars, terraform apply (another 60 min)
+  Continue:  Keep testing (30 more min available)
+  Cleanup:   terraform destroy (costs stop immediately)
+
+═══════════════════════════════════════════════════════════════════════
+
+For detailed information, see: TTL_AND_AUTO_TERMINATION.md

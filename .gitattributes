@@ -1,0 +1,29 @@
+# Auto normalize line endings for all text files
+* text=auto
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# PowerShell scripts
+*.ps1 text eol=crlf
+
+# Terraform
+*.tf text eol=lf
+*.tfvars text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Documentation
+*.txt text eol=lf
+*.md text eol=lf
+
+# YAML/JSON
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Binary files
+*.pem binary
+*.key binary

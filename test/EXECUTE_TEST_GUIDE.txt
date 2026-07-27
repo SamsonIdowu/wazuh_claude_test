@@ -1,0 +1,236 @@
+═══════════════════════════════════════════════════════════════════════
+              AUTOMATED TEST EXECUTION - QUICK START GUIDE
+═══════════════════════════════════════════════════════════════════════
+
+🎯 WHAT IS THIS?
+
+A self-executing test automation system where you simply type "execute test"
+and Claude automatically:
+  1. Reads your Google Drive document
+  2. Creates test implementation steps
+  3. Deploys infrastructure
+  4. Runs tests end-to-end
+  5. Generates test results
+
+═══════════════════════════════════════════════════════════════════════
+
+📋 HOW TO USE IT
+
+Step 1: Update the Google Drive Link
+────────────────────────────────────
+  1. Open: AUTOMATED_TEST_TEMPLATE.md
+  2. Find: "Google Drive Document Link" section
+  3. Replace: the example URL with YOUR Google Drive document link
+  4. Save the file
+
+Step 2: Execute Test
+────────────────────
+  Simply message Claude:
+  
+    "execute test"
+  
+  That's it! Claude will read the template and automatically:
+  • Parse the Google Drive link
+  • Read your document
+  • Create test implementation steps
+  • Deploy infrastructure
+  • Execute all tests
+  • Generate results
+
+Step 3: Check Results
+─────────────────────
+  After execution completes (20-40 minutes), check:
+
+    Results/
+    ├── test-implementation-steps.md  (What was tested)
+    ├── test-verdict.md               (Pass/Fail/Partial)
+    ├── test-details.md               (Full findings)
+    └── execution-log.txt             (Timeline of events)
+
+═══════════════════════════════════════════════════════════════════════
+
+📁 TEMPLATE LOCATION
+
+File: AUTOMATED_TEST_TEMPLATE.md
+
+Content:
+  • Configuration section (Google Drive link goes here)
+  • Automated test procedure (6 phases)
+  • Expected output files
+  • Self-execution instructions for Claude
+  • Optional custom parameters
+  • FAQ and command reference
+
+═══════════════════════════════════════════════════════════════════════
+
+🔄 TEST EXECUTION PHASES
+
+When you say "execute test", Claude follows this procedure:
+
+Phase 1: Document Analysis (5 min)
+  └─ Read AUTOMATED_TEST_TEMPLATE.md
+  └─ Extract Google Drive document link
+  └─ Read the document to understand requirements
+
+Phase 2: Test Planning & Infrastructure Analysis (10 min)
+  └─ Extract infrastructure requirements from document
+  └─ Identify instance types, OS versions, component versions, storage
+  └─ Generate terraform/terraform.tfvars from requirements
+  └─ Update terraform variables if new parameters needed
+  └─ Map blog post steps to test procedures
+  └─ Create test-implementation-steps.md with infrastructure details
+
+Phase 3: Infrastructure Setup (10 min)
+  └─ Run setup.ps1 (auto-detect your IP)
+  └─ Run terraform init && terraform plan && terraform apply
+  └─ Wait for services (5-10 minutes)
+
+Phase 4: Test Execution (10-15 min)
+  └─ SSH to Wazuh server
+  └─ Deploy configurations
+  └─ Run each test step sequentially
+  └─ Capture results
+
+Phase 5: Results & Verdict (5 min)
+  └─ Create test-verdict.md (Pass/Fail/Partial)
+  └─ Create test-details.md (findings)
+  └─ Generate summary
+
+Phase 6: Cleanup (auto-managed)
+  └─ Resources auto-terminate after 1 hour
+  └─ Or manually run: terraform destroy
+  └─ Or extend TTL in terraform.tfvars
+
+═══════════════════════════════════════════════════════════════════════
+
+📊 WHAT GETS GENERATED
+
+After "execute test", check Results/:
+
+Results/test-implementation-steps.md
+  • Detailed steps taken to test the blog post
+  • Maps each blog post step to actual test procedure
+  • Shows what infrastructure was used
+  • Documents any configuration changes
+
+Results/test-verdict.md
+  • Overall verdict: PASS / FAIL / PARTIAL
+  • Summary of what worked and what didn't
+  • Quick reference for main findings
+  • Recommendations for next steps
+
+Results/test-details.md
+  • Complete findings and detailed logs
+  • Output from each test step
+  • SSH command results
+  • Configuration changes made
+  • Any errors encountered
+
+Results/execution-log.txt
+  • Timeline of everything that happened
+  • Timestamps for each phase
+  • Status of each component
+  • Resource URLs and connection details
+
+═══════════════════════════════════════════════════════════════════════
+
+🚀 COMPLETE WORKFLOW EXAMPLE
+
+Day 1, 10:00 AM:
+  1. Open AUTOMATED_TEST_TEMPLATE.md
+  2. Add your Google Drive document link
+  3. Save
+  4. Message Claude: "execute test"
+
+Day 1, 10:05 AM:
+  Claude reads your document and extracts requirements
+
+Day 1, 10:10 AM:
+  Infrastructure analysis and terraform script generation
+
+Day 1, 10:15 AM:
+  Infrastructure deployment begins
+  (terraform init, plan, apply with generated config)
+
+Day 1, 10:25 AM:
+  Services initialized, test execution starts
+
+Day 1, 10:40 AM:
+  All tests complete, results generated
+
+Day 1, 10:45 AM:
+  Claude reports results:
+    ✓ test-implementation-steps.md created (with infrastructure details)
+    ✓ test-verdict.md: PASS/FAIL/PARTIAL
+    ✓ test-details.md with full findings
+    ✓ execution-log.txt with timeline
+
+═══════════════════════════════════════════════════════════════════════
+
+⚙️ CUSTOMIZATION OPTIONS
+
+Optional parameters in AUTOMATED_TEST_TEMPLATE.md:
+
+Deployment Configuration:
+  • aws_region (default: us-east-1)
+  • wazuh_version (default: 4.14.6)
+  • resource_ttl_minutes (default: 60)
+  • enable_auto_termination (default: true)
+
+Test Scope:
+  • Mark which tests to run
+  • Skip infrastructure if already deployed
+  • Extend test coverage
+
+Test Timeout:
+  • Adjust how long to wait for services
+  • Configure retry behavior
+
+═══════════════════════════════════════════════════════════════════════
+
+💡 QUICK COMMANDS
+
+Execute test:               "execute test"
+Stop test:                  "stop test"
+Check status:               "show test status"
+View results:               "show test results"
+Extend infrastructure:      Edit terraform.tfvars → terraform apply
+Cleanup resources:          "terraform destroy"
+View implementation steps:  cat Results/test-implementation-steps.md
+View verdict:               cat Results/test-verdict.md
+View details:               cat Results/test-details.md
+
+═══════════════════════════════════════════════════════════════════════
+
+❓ FAQ
+
+Q: How do I start?
+A: Update the Google Drive link in AUTOMATED_TEST_TEMPLATE.md, then say
+   "execute test"
+
+Q: What if I need to stop mid-test?
+A: Say "stop test" - infrastructure stays running, you can clean up manually
+
+Q: How long does it take?
+A: Usually 20-40 minutes total (5 min analysis, 10 min deploy, 15 min tests)
+
+Q: What if deployment fails?
+A: Claude will report the error. Fix the issue and run "execute test" again
+
+Q: Can I run tests multiple times?
+A: Yes. Update the Google Drive link and run "execute test" again
+
+Q: How do I use different infrastructure settings?
+A: Edit the optional parameters section in AUTOMATED_TEST_TEMPLATE.md
+
+═══════════════════════════════════════════════════════════════════════
+
+🎉 YOU'RE ALL SET!
+
+1. Update AUTOMATED_TEST_TEMPLATE.md with your Google Drive link
+2. Say "execute test" to Claude
+3. Check Results/ folder for results when done
+
+That's it! The automation handles the rest.
+
+═══════════════════════════════════════════════════════════════════════

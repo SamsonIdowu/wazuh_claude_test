@@ -1,0 +1,6 @@
+# Test Results Directory
+# Files created here during automated test execution:
+# - test-implementation-steps.md    (What was tested)
+# - test-verdict.md                 (Pass/Fail/Partial verdict)
+# - test-details.md                 (Full findings and logs)
+# - execution-log.txt               (Timeline of execution)
