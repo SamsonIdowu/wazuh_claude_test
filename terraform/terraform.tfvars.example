@@ -1,42 +1,45 @@
-# AWS Credentials - Read from local file
-# Create a file at ~/.aws/credentials with your AWS access key and secret key
-# Example format:
-# [default]
-# aws_access_key_id = YOUR_ACCESS_KEY
-# aws_secret_access_key = YOUR_SECRET_KEY
+# Copy to terraform.tfvars and adjust.
+#   cp terraform.tfvars.example terraform.tfvars
 #
-# Then uncomment and set the variables below:
+# Every variable here must exist in variables.tf. Terraform fails with
+# "An argument named ... is not expected here" on any stale name, so keep the
+# two files in sync when adding variables.
+#
+# AWS credentials are NOT set here. Use ~/.aws/credentials, environment
+# variables, or an instance role. Never put keys in this file - it is committed.
 
-# aws_access_key = file("~/.aws/credentials")  # This needs to be parsed manually
-# aws_secret_key = ""
+# ---- General -------------------------------------------------------------
+aws_region    = "us-east-1"
+wazuh_version = "4.14.6" # applies to manager, indexer, dashboard and agent
 
-# OR use a custom credentials file:
-# aws_access_key = file("/path/to/your/credentials/file/access_key.txt")
-# aws_secret_key = file("/path/to/your/credentials/file/secret_key.txt")
+# ---- Wazuh server (manager + indexer + dashboard, all-in-one) ------------
+wazuh_server_instance_type = "t3.xlarge"
+wazuh_server_volume_size   = 30
 
-# Instance Configuration
-aws_region      = "us-east-1"
-instance_name   = "wazuh-4-14-6-instance"
-instance_type   = "t3.xlarge"
-root_volume_size = 30
-wazuh_version   = "4.14.6"
+# ---- Wazuh agent (monitored endpoint) -----------------------------------
+agent_instance_type = "t3.medium"
+agent_volume_size   = 20
 
-# Networking
-associate_public_ip = true
+# ---- TheHive (Cassandra + Elasticsearch + TheHive) ----------------------
+# t3.large minimum: three JVM heaps (~1G each) do not fit in t3.medium's 4G.
+thehive_instance_type = "t3.large"
+thehive_volume_size   = 30
 
-# Security - IMPORTANT: Restrict these CIDR blocks for production
-allowed_ssh_cidrs      = ["0.0.0.0/0"]  # WARNING: Change to your IP for security
-allowed_api_cidrs      = ["0.0.0.0/0"]  # WARNING: Change to your IP for security
-allowed_agent_cidrs    = ["0.0.0.0/0"]
-allowed_cluster_cidrs  = ["0.0.0.0/0"]
+# ---- Security -----------------------------------------------------------
+# 0.0.0.0/0 is convenient for a short test but exposes these ports to the
+# internet. Prefer ["YOUR.IP.ADDR.ESS/32"].
+# Note: agent traffic (1514) and enrolment (1515) are always restricted to the
+# VPC CIDR in main.tf and are not configurable here.
+allowed_ssh_cidrs = ["0.0.0.0/0"] # SSH (22)
+allowed_api_cidrs = ["0.0.0.0/0"] # Wazuh API (55000) and indexer (9200)
 
-# SSH Key Output Path
+# Where the generated SSH private key is written.
 ssh_key_output_path = "."
 
-# Environment
-environment = "testing"
-
-# Auto-Destruction TTL (in minutes)
-# Instance will automatically destroy itself after this time if terraform destroy is not run manually
-# Default: 120 minutes (2 hours)
-instance_ttl_minutes = 120
+# ---- TTL / auto-termination ---------------------------------------------
+# Enforced for real: each instance runs `shutdown -h +N` as the first action in
+# user_data, with instance_initiated_shutdown_behavior = "terminate".
+# This is a safety net against forgetting, NOT a substitute for
+# `terraform destroy`. See test/TTL_AND_AUTO_TERMINATION.md.
+resource_ttl_minutes    = 240 # 1-1440
+enable_auto_termination = true

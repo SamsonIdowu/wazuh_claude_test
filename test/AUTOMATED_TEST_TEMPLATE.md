@@ -1,287 +1,359 @@
-# Automated Test Execution Template
+# Automated Test Template
 
-## Purpose
-This file serves as a self-executing test automation guide. When you say "execute test" to Claude, it will:
-1. Read this file
-2. Extract the Google Drive document link
-3. Read the document to understand test requirements
-4. Create comprehensive test implementation steps
-5. Deploy infrastructure (if needed)
-6. Execute tests end-to-end
-7. Generate test results and verdict
+Fill in the **Configuration** section, save, then tell Claude: **`execute test`**
+
+This template is product-agnostic. It works for any test that follows the shape
+*"stand up infrastructure from a document, exercise it, report a verdict"* —
+Wazuh, Shuffle, TheHive, or anything else described in a source document.
 
 ---
 
-## 🧹 Clean Up Previous Test Run
+## Configuration — fill this in
 
-If you're running a new test and want to clean up from a previous test run, use this prompt:
+### 1. Source document (required)
 
 ```
-cleanup test
+DOCUMENT: https://docs.google.com/document/d/PASTE_ID_HERE/edit
 ```
 
-This will automatically:
-- Destroy all AWS infrastructure (terraform destroy)
-- Remove previous test results from Results/
-- Reset terraform/terraform.tfvars (removing test-specific variables)
-- Keep test templates and documentation intact
-- Ready the repository for a fresh test
+Google Docs, a URL, or a local path. Must be readable by Claude.
 
-**Or manually clean up:**
+### 2. Test scope (optional — defaults to everything the document describes)
+
+```
+IN SCOPE:     all scenarios described in the document
+OUT OF SCOPE:
+```
+
+### 3. Infrastructure overrides (optional — otherwise derived from the document)
+
+```
+REGION:       us-east-1
+TTL_MINUTES:  240
+```
+
+### 4. External integrations (required only if the document uses them)
+
+Do **not** paste secrets into this file — it is version-controlled. Provide them
+in chat, or export them as environment variables. Just declare which are needed:
+
+```
+INTEGRATIONS NEEDED:  [ ] Slack   [ ] Shuffle   [ ] TheHive   [ ] Jira   [ ] other: ______
+PROVISION ON AWS:     [ ] TheHive (Terraform can deploy it)
+```
+
+### 5. Teardown policy
+
+```
+ON COMPLETION:  [x] destroy immediately   [ ] keep until I say so
+```
+
+---
+
+## Rules Claude must follow
+
+These are derived from a real run where ignoring them cost hours and money.
+They are not stylistic preferences.
+
+### R1 — Never report success without a command confirming it
+
+State the evidence alongside every claim. Specifically:
+
+| Don't trust | Because | Check instead |
+|---|---|---|
+| `systemctl is-active` | Process can run while broken. A Wazuh agent shows `active` while never enrolling. | The functional endpoint (`agent_control -l`) |
+| `docker ps` = `Up` | Container started ≠ app serving | `curl` the app's status endpoint |
+| `terraform apply` success | Means the VM exists, not that provisioning finished | `cloud-init status` + a marker file |
+| A tag or a doc | Metadata is not behaviour | Find the code that enforces it |
+| Elapsed time | Slow ≠ progressing, and ≠ dead | Read a log; check the process |
+
+If a check has not been run, write **UNVERIFIED**. Never write ✅ or PASS
+speculatively — a false PASS sends debugging at the wrong component and wastes
+the whole session.
+
+### R2 — Verify a URL before piping it to a shell
+
 ```bash
-# Destroy infrastructure
-cd terraform
-terraform destroy
-
-# Remove previous test results
-rm -f Results/test-*.md Results/execution-log.txt
-
-# Reset terraform config (use example)
-rm terraform/terraform.tfvars
-cp terraform.tfvars.example terraform/terraform.tfvars
+curl -s -o /dev/null -w '%{http_code}' "$URL"   # must be 200
 ```
+
+A 403 or 404 piped to `bash` fails **silently** and looks like a clean install.
+
+### R3 — Write install scripts that fail loudly
+
+```bash
+set -euxo pipefail
+exec > >(tee -a /var/log/<component>-install.log) 2>&1
+# ... work ...
+echo "READY=$(date -Is)" > /root/<COMPONENT>_READY   # poll for this, don't guess
+```
+
+Add a readiness gate that polls the real endpoint and `exit 1`s on timeout.
+Never conclude "it should be up by now."
+
+### R4 — Editing `user_data` does not re-provision an instance
+
+`cloud-init` runs user-data only on **first boot**. `terraform apply` after an
+edit resizes in place, keeps the **same instance ID**, and reports success while
+the corrected script never runs.
+
+```bash
+terraform apply -replace=aws_instance.<name> -target=aws_instance.<name>
+```
+
+Confirm the **instance ID changed**. Each replacement also assigns a new public IP.
+
+### R5 — Prefer the vendor's official installer and compose files
+
+Hand-rolled installs cost this project two full redeploys. Use the vendor
+quickstart script or clone their compose repo, and pin versions. When adapting a
+vendor script for unattended use, check for interactive prompts —
+`grep -n 'read -p' <script>` — because there is often more than one.
+
+### R6 — Confirm teardown against the cloud provider, not the tool
+
+```bash
+aws ec2 describe-instances --filters "Name=tag:Name,Values=..." \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name]' --output table
+aws ec2 describe-volumes --filters "Name=status,Values=available"   # orphans bill
+```
+
+### R7 — Never commit secrets
+
+Tokens go in chat or env vars, never into a results file. `.gitignore` blocks
+common credential filenames, but do not rely on it.
+
+### R8 — Ask before spending or exposing
+
+Confirm first when about to: exceed the declared TTL, resize up, open a port to
+`0.0.0.0/0`, or destroy anything. State the cost or exposure in the question.
 
 ---
 
-## Configuration
+## Execution phases
 
-### Google Drive Document Link
-**PASTE YOUR GOOGLE DRIVE LINK HERE:**
-```
-https://docs.google.com/document/d/1C66pKpeAqM4uoWy4cr0BJJv5GkeLBNbh6UR8uTdHS10/edit
-```
+### Phase 1 — Read the document
+Extract: components and versions, infrastructure requirements, the test
+scenarios, expected outcomes, and any required external integrations.
 
-**Instructions to update:**
-1. Replace the URL above with your Google Drive document link
-2. Ensure the document is readable (share with viewer access if needed)
-3. Save this file
-4. Tell Claude: "execute test"
+Then **restate the plan and the estimated cost, and confirm before spending.**
 
----
+### Phase 2 — Plan
+Write `results/test-implementation-steps.md`: infrastructure to be deployed, each
+document scenario mapped to a concrete procedure, and the pass criteria.
 
-## Automated Test Procedure (Do NOT Modify)
+Generate `terraform/terraform.tfvars` from the document's requirements.
 
-### When You Say "Execute Test", Claude Will:
+### Phase 3 — Deploy
+`terraform init && terraform validate && terraform apply`
 
-#### Phase 1: Document Analysis
-```
-□ Read this file to extract Google Drive document link
-□ Access the Google Drive document
-□ Identify infrastructure requirements
-□ Identify test implementation steps
-□ Document expected outcomes
-```
+Then **wait on a marker file** (per R3), not a guessed duration. Verify
+`cloud-init status` is `done`, not `error`.
 
-#### Phase 2: Test Planning & Infrastructure Analysis
-```
-□ Identify infrastructure requirements from document:
-  - Instance types and sizes needed
-  - OS versions required
-  - Component versions (Wazuh, etc.)
-  - Storage requirements
-  - Network/security configurations
-  - Any special parameters or settings
-□ Generate/modify terraform scripts to match requirements:
-  - Create terraform/terraform.tfvars with document-derived values
-  - Update variables.tf if new parameters needed
-  - Ensure all requirements are captured
-□ Create detailed test implementation steps file in Results/ folder
-□ Map blog post steps to test procedures
-□ Plan test execution timeline
-□ Verify infrastructure configuration matches document requirements
-```
+Immediately after apply, write every `terraform output` (DNS names, IPs,
+generated key paths) to `results/deployment-outputs.md` (see box below). Do not
+let these values live only in chat or in Terraform state.
 
-#### Phase 3: Infrastructure Setup
-```
-□ Verify terraform files are ready
-□ Run setup.ps1 to auto-detect your IP
-□ Run terraform init (if not done)
-□ Run terraform plan
-□ Run terraform apply
-□ Wait for services to initialize (5-10 minutes)
-```
+### Phase 4 — Verify the platform *before* testing it
 
-#### Phase 4: Test Execution
-```
-□ SSH to Wazuh server
-□ Deploy any required test scripts/configurations
-□ Execute test steps sequentially
-□ Capture output and results
-□ Verify each step completion
-```
+Do not run scenarios against an unverified platform. Build a table:
 
-#### Phase 5: Results & Verdict
-```
-□ Document test results
-□ Create test-verdict.md file (Pass/Fail/Partial)
-□ Create test-details.md with findings
-□ Generate summary report
-□ Save all outputs to Results/ folder
-```
+| Check | Command | Result |
+|---|---|---|
+| services active | `systemctl is-active <svc>` | |
+| UI serving | `curl -k -o /dev/null -w '%{http_code}'` | |
+| API authenticating | real auth call returning a token | |
+| agent/client registered | the functional check, not the process check | |
+| credentials valid | one live API call per integration | |
 
-#### Phase 6: Cleanup
-```
-□ Option A: Auto-cleanup (wait 60 min or run terraform destroy)
-□ Option B: Extend if more testing needed
-□ Option C: Keep running for manual verification
-```
+Test every supplied credential here. Discovering a bad token mid-run wastes the
+window.
+
+As credentials are generated or retrieved (a vendor installer's random admin
+password, an API key created for the test, a cert fingerprint), append them to
+`results/deployment-outputs.md` — never into `test-verdict.md` or
+`execution-log.txt`, which are meant to be shareable.
 
 ---
 
-## Expected Output Files
+#### `results/deployment-outputs.md` — all deployment outputs, one file
 
-After "execute test" completes, you'll have:
-
-```
-Results/
-├── test-implementation-steps.md    (Blog post steps → test procedures)
-├── test-verdict.md                 (PASS/FAIL/PARTIAL summary)
-├── test-details.md                 (Detailed findings and logs)
-└── execution-log.txt               (Full execution timeline)
-```
-
----
-
-## How to Use This File
-
-### First Time Setup:
-1. Edit the "Google Drive Document Link" section above
-2. Paste your document URL
-3. Save this file
-
-### To Execute Tests:
-1. Simply message Claude: **"execute test"**
-2. Claude will automatically read this file and run the entire test procedure
-3. Wait for completion (typically 20-40 minutes)
-4. Check Results/ folder for results
-
-### To Modify Test Parameters:
-Edit the sections below and Claude will adapt the procedure:
-
----
-
-## Optional: Custom Test Parameters
-
-### Deployment Configuration
-```
-# Edit if you want different resource settings:
-aws_region = "us-east-1"
-wazuh_version = "4.14.6"
-resource_ttl_minutes = 60          # 1 hour default
-enable_auto_termination = true     # Auto-cleanup enabled
-```
-
-### Test Scope (Optional)
-```
-# Mark which tests to run:
-☐ Infrastructure deployment
-☐ Service verification
-☐ Blog post implementation steps
-☐ EOL detection functionality
-☐ Dashboard accessibility
-☐ Alert generation and verification
-☐ Full end-to-end workflow
-```
-
-### Test Timeout (Optional)
-```
-# Maximum time to wait for infrastructure:
-timeout_minutes = 20               # Time to wait for services
-```
-
----
-
-## Claude Self-Execution Instructions
-
-**These instructions are for Claude to follow when you say "execute test":**
+Every credential, DNS name, IP address, and cert path the deployment produces
+goes in exactly one file, so nothing sensitive is scattered across chat,
+`execution-log.txt`, or the verdict:
 
 ```markdown
-WHEN USER SAYS "execute test":
+# Deployment Outputs — SENSITIVE, not committed, deleted after this test
 
-1. READ THIS FILE (AUTOMATED_TEST_TEMPLATE.md)
-2. EXTRACT the Google Drive document link from Configuration section
-3. READ the Google Drive document using mcp__claude_ai_Google_Drive__read_file_content
-4. IDENTIFY:
-   - Infrastructure requirements (instance types, OS, versions, storage, etc.)
-   - Test implementation steps from blog post
-   - Expected outcomes and acceptance criteria
-5. GENERATE/MODIFY infrastructure scripts:
-   - Create/update terraform/terraform.tfvars with:
-     * Instance types and sizes from document
-     * OS versions from document
-     * Component versions from document
-     * Storage requirements
-     * Any other parameters mentioned
-   - Update variables.tf if document requires new parameters
-   - Ensure terraform can use document-derived values
-6. CREATE test-implementation-steps.md in Results/ folder:
-   - Document the infrastructure being used
-   - Map each blog post step to actual test procedure
-   - Reference the terraform configuration used
-7. DEPLOY infrastructure:
-   - Verify terraform files exist
-   - Run setup.ps1 for IP detection
-   - Run: terraform init && terraform plan && terraform apply
-   - Wait 5-10 minutes for services
-8. EXECUTE each test step (from test-implementation-steps.md):
-   - SSH to instances
-   - Configure Wazuh if needed
-   - Run tests per procedures
-   - Capture results
-9. CREATE test-verdict.md (PASS/FAIL/PARTIAL)
-10. CREATE test-details.md (findings and logs)
-11. SAVE all results to Results/ folder
-12. REPORT back with summary
+## Infrastructure
+- <component>: <public DNS> / <public IP> / <private IP>
+- SSH: `ssh -i <generated-key>.pem ubuntu@<dns>`
+
+## Credentials (as generated/retrieved — never guess or reuse an example value)
+- <component> dashboard: <URL> — <user> / <password>
+- <component> API key: <key>
+
+## Certificates
+- <path or fingerprint, if the deployment generates one>
+
+## External integrations supplied for this test
+- <service>: <endpoint> — <token, if the user provided one for this run>
 ```
 
+This file:
+- **Must never appear in `test-verdict.md`, `execution-log.txt`, or the PDF
+  report** — those are written to be shared; this one is not.
+- **Must be covered by `.gitignore`** before it is ever written.
+- **Must be deleted at Phase 7 (Teardown)**, every time, regardless of whether
+  the test passed or failed. Confirm the deletion (R1) — don't assume `rm`
+  succeeded.
+
+### Phase 5 — Execute scenarios
+Run each scenario from the document, then **confirm the effect** — query for the
+data, don't assume the trigger worked.
+
+### Phase 6 — Report
+
+Write `results/test-verdict.md` with a per-step evidence table, and
+`results/execution-log.txt` separating VERIFIED from UNVERIFIED.
+
+Record every defect: symptom → root cause → fix. Distinguish defects in the
+*subject under test* from defects in *this repo's own config*.
+
+#### Then generate `results/test-report.pdf`
+
+A self-contained PDF containing **four tables, in this order**:
+
+**Table 1 — General status** (one row, the summary)
+
+| Field | Value |
+|---|---|
+| Verdict | PASS / FAIL / PARTIAL |
+| Steps passed | e.g. 8/8 |
+| Document under test | title + link |
+| Components & versions | e.g. Wazuh 4.14.6, TheHive 5.7.3 |
+| Started / finished / duration | |
+| Infrastructure | instance types and count |
+| Cost | accrued $ |
+| Teardown | destroyed + verified / still running |
+
+**Table 2 — Step-by-step status** (one row per step; the core of the report)
+
+| # | Phase | Step | Command / method | Expected | Actual | Status |
+|---|---|---|---|---|---|---|
+
+`Status` ∈ PASS / FAIL / SKIPPED / **UNVERIFIED**. Every PASS must name the
+command in `Actual` that proves it (per R1). Include steps that were skipped and
+why — a silently omitted step reads as coverage that does not exist.
+
+**Table 3 — Failed steps** (omit the table only if genuinely zero failures)
+
+| # | Step | Symptom / error | Root cause | Fix applied | Resolved |
+|---|---|---|---|---|---|
+
+Quote the actual error text, not a paraphrase. State whether the defect was in
+the subject under test or in this repo's own configuration — they have different
+audiences.
+
+**Table 4 — Recommendations**
+
+| # | Priority | Area | Recommendation | Rationale |
+|---|---|---|---|---|
+
+Priority ∈ HIGH / MEDIUM / LOW. Cover at minimum: unresolved failures, security
+exposure created during the test (open ports, plaintext credentials), cost or TTL
+risks, and any limitation that weakens the verdict.
+
+**Generation.** Write `results/test-report.html` first — self-contained, with a
+print stylesheet and **no external assets** (inline the CSS; remote fonts or
+stylesheets will not load during conversion).
+
+Primary method: **headless Chrome or Edge.** Verified working on this machine;
+`wkhtmltopdf`, `pandoc`, `weasyprint` and `reportlab` were all confirmed *absent*,
+so do not reach for them first.
+
+```bash
+CHROME="/c/Program Files/Google/Chrome/Application/chrome.exe"
+# fallback: "/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+
+"$CHROME" --headless --disable-gpu --no-pdf-header-footer \
+  --print-to-pdf="$(cygpath -w "$PWD/results/test-report.pdf")" \
+  "$(cygpath -w "$PWD/results/test-report.html")"
+```
+
+`cygpath -w` matters — the browser needs Windows paths, and a POSIX path fails
+silently with no PDF written.
+
+If no browser is present, install a converter on demand (`pip install weasyprint`).
+
+Then **verify the artifact** rather than assuming (R1):
+
+```bash
+ls -l results/test-report.pdf && file results/test-report.pdf
+# expect: non-trivial size and "PDF document, version N, M page(s)"
+```
+
+A zero-byte or missing file means the conversion failed regardless of the exit
+code. If every method fails, say so plainly, keep the HTML, and report the PDF as
+**not generated** — never claim a PDF exists without the `file` check.
+
+Never fabricate table contents. If a value was not measured, write UNVERIFIED.
+
+### Phase 7 — Teardown
+Follow the declared policy. Destroy, then verify per R6 (against the cloud
+provider, not the exit code) and report the final cost.
+
+Then, unconditionally:
+
+```bash
+rm -f results/deployment-outputs.md
+ls results/deployment-outputs.md 2>&1   # must report "No such file" — confirm, don't assume
+```
+
+Do this whether the test passed or failed, and whether the user asked for
+cleanup or not — a results directory left holding live credentials after the
+infrastructure is gone is a real exposure, not a formality.
+
 ---
 
-## FAQ
+## Deliverables
 
-### Q: What if the Google Drive document is private?
-**A:** Make sure it's shared with viewer access. You may need to update sharing settings.
+```
+results/
+├── test-implementation-steps.md   scenarios mapped to procedures
+├── test-verdict.md                PASS / FAIL / PARTIAL + evidence table
+├── execution-log.txt              timeline, VERIFIED vs UNVERIFIED
+├── test-report.html               printable source for the PDF
+├── test-report.pdf                4 tables: general status, step-by-step,
+│                                  failed steps, recommendations
+└── deployment-outputs.md          credentials/DNS/IP/certs — SENSITIVE,
+                                   gitignored, deleted at Phase 7, every time
+```
 
-### Q: Can I cancel the test execution?
-**A:** Yes, at any phase you can ask Claude to stop. Resources will stay running (use terraform destroy to cleanup).
-
-### Q: What if infrastructure deployment fails?
-**A:** Claude will report the error and stop. You can fix the issue and restart.
-
-### Q: How do I extend the TTL if tests are running long?
-**A:** Edit ../terraform/terraform.tfvars and change resource_ttl_minutes, then run terraform apply.
-
-### Q: Can I run multiple tests?
-**A:** Update the Google Drive document link and run "execute test" again.
-
----
-
-## Command Reference
-
-| Need | Command |
-|------|---------|
-| Start automated test | "execute test" |
-| Stop test execution | "stop test" or Ctrl+C |
-| Check test progress | "show test status" |
-| View test results | "show test results" |
-| Extend infrastructure TTL | Edit terraform.tfvars → terraform apply |
-| Cleanup resources | "terraform destroy" |
+Reusable procedures and gotchas go in `DEPLOYMENT_RUNBOOK.md` at the repo root —
+so the next run does not rediscover them.
 
 ---
 
-## Version
-- **Created:** 2026-07-27
-- **Last Updated:** 2026-07-27
-- **Status:** Ready for use
-- **Compatibility:** Claude Code with Google Drive integration
+## Other prompts
+
+| Say | Effect |
+|---|---|
+| `execute test` | Run the full flow above |
+| `status` | Report verified state; re-check rather than recall |
+| `cleanup test` | Destroy infrastructure and reset for a fresh run |
+| `destroy now` | Immediate teardown |
 
 ---
 
-## Next Steps
+## Adapting this to a new product
 
-1. **Update the Google Drive Document Link** (see Configuration section above)
-2. **Save this file**
-3. **Tell Claude: "execute test"**
-4. **Check test/ folder for results**
+1. Replace the Terraform in `terraform/` with what your product needs, keeping
+   the TTL wiring (`local.ttl_prologue` + `instance_initiated_shutdown_behavior`).
+2. Point `DOCUMENT` at your source document.
+3. Note the product's verification commands in Phase 4 — the *functional* check
+   for each component, not the process check.
+4. Keep R1–R8 unchanged. They are product-independent.
 
-That's it! Claude will handle the rest automatically.
-
+See `DEPLOYMENT_RUNBOOK.md` for a worked example (Wazuh + TheHive), including
+each failure encountered and how it was resolved.

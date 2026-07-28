@@ -68,3 +68,15 @@ variable "enable_auto_termination" {
   type        = bool
   default     = true
 }
+
+variable "thehive_instance_type" {
+  description = "Instance type for TheHive server"
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "thehive_volume_size" {
+  description = "Root volume size for TheHive server (GB)"
+  type        = number
+  default     = 20
+}

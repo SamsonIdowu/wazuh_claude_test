@@ -1,31 +1,57 @@
 # Test Documentation
 
-This directory contains all test instructions and documentation.
+## Files
 
-## Files in this Directory
+- **AUTOMATED_TEST_TEMPLATE.md** — The template to fill in and run. Product-agnostic:
+  works for any "deploy from a document, exercise it, report a verdict" test.
+  Contains rules R1–R8 that Claude must follow during a run.
+- **TTL_AND_AUTO_TERMINATION.md** — How self-termination actually works, and why
+  the previous cosmetic implementation cost ~$4.92 in forgotten instances.
 
-- **AUTOMATED_TEST_TEMPLATE.md** — Self-executing test template. Edit this to add your Google Drive document link, then say "execute test" to Claude.
+See also **`../DEPLOYMENT_RUNBOOK.md`** — the worked Wazuh + TheHive example, with
+every failure encountered, its root cause, and the fix.
 
-- **EXECUTE_TEST_GUIDE.txt** — Quick start guide for running automated tests.
+## Getting started
 
-- **TTL_AND_AUTO_TERMINATION.md** — Complete guide for managing resource Time-To-Live and auto-termination.
+1. Edit `AUTOMATED_TEST_TEMPLATE.md` → set `DOCUMENT:` to your source document
+2. Declare any external integrations needed (do **not** paste secrets — the file
+   is version-controlled; supply them in chat)
+3. Save
+4. Tell Claude: **`execute test`**
+5. Results land in `../results/`
 
-- **TTL_SUMMARY.txt** — Quick reference for TTL features and commands.
+## Other prompts
 
-## Getting Started
+| Say | Effect |
+|---|---|
+| `execute test` | Run the full flow |
+| `status` | Report verified state (re-checked, not recalled) |
+| `cleanup test` | Destroy infrastructure and reset |
+| `destroy now` | Immediate teardown |
 
-1. Edit `AUTOMATED_TEST_TEMPLATE.md` and add your Google Drive document link
-2. Say "execute test" to Claude
-3. Check the `Results/` directory (at repository root) for test outputs
+## Test results
 
-## Test Results
+Written to `results/` at the repository root:
 
-Test results are stored in the **Results/** directory at the repository root:
-- `Results/test-implementation-steps.md` — What was tested
-- `Results/test-verdict.md` — Pass/Fail/Partial verdict
-- `Results/test-details.md` — Full findings and logs
-- `Results/execution-log.txt` — Timeline of execution
+- `test-implementation-steps.md` — scenarios mapped to procedures
+- `test-verdict.md` — PASS / FAIL / PARTIAL plus a per-step evidence table
+- `execution-log.txt` — timeline, separating VERIFIED from UNVERIFIED
+- `test-report.pdf` — printable report: general status, step-by-step status,
+  failed steps, and recommendations (four tables)
+- `deployment-outputs.md` — **sensitive, gitignored, deleted at teardown.**
+  Every credential, DNS name, IP, and cert path the deployment produced. Not
+  referenced from any of the files above, which are meant to be shared.
 
-## Main Documentation
+## Before trusting a result
 
-For complete project documentation, see **README.md** at the repository root.
+A verdict is only as good as its evidence. `systemctl is-active` proves a process
+runs, not that it works. `docker ps` showing `Up` proves a container started, not
+that it serves traffic. `terraform apply` succeeding proves a VM exists, not that
+provisioning finished.
+
+Every claim in `test-verdict.md` should name the command that confirmed it, and
+anything unchecked should say **UNVERIFIED**.
+
+## Main documentation
+
+See `README.md` at the repository root.

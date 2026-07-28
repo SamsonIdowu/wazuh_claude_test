@@ -19,6 +19,44 @@ provider "aws" {
   region = var.aws_region
 }
 
+# ---------------------------------------------------------------------------
+# REAL TTL ENFORCEMENT
+#
+# History: resource_ttl_minutes and enable_auto_termination used to produce only
+# a local text file and two EC2 tags. Nothing enforced them. A test run was left
+# running for 17 hours (~$4.92) because the tags and docs claimed
+# "auto-termination enabled" while no mechanism existed.
+#
+# Enforcement now has two parts, and BOTH are required:
+#   1. `shutdown -h +N` scheduled as the FIRST action in user_data, before any
+#      install work, so a failed or hung install still terminates on time.
+#   2. instance_initiated_shutdown_behavior = "terminate", so the shutdown
+#      TERMINATES rather than stops the instance. Without this the instance
+#      merely stops and its EBS volumes keep billing.
+#
+# This is deliberately dumb and local: no Lambda, no scheduler, nothing external
+# that can silently fail. The instance kills itself.
+# ---------------------------------------------------------------------------
+locals {
+  # Heredocs cannot be embedded directly in a ternary, so build both branches
+  # separately and select between them.
+  ttl_prologue_enabled = <<-EOT
+    #!/bin/bash
+    # --- TTL self-termination (${var.resource_ttl_minutes} min) ---
+    # Scheduled first so it survives any later failure in this script.
+    /sbin/shutdown -h +${var.resource_ttl_minutes} "Auto-terminating after ${var.resource_ttl_minutes}min TTL" || true
+    echo "TTL_SCHEDULED=$(date -Is) MINUTES=${var.resource_ttl_minutes}" > /root/TTL_SCHEDULED
+    # --- end TTL ---
+  EOT
+
+  ttl_prologue_disabled = "#!/bin/bash\n# TTL enforcement disabled (enable_auto_termination = false)\n"
+
+  ttl_prologue = var.enable_auto_termination ? local.ttl_prologue_enabled : local.ttl_prologue_disabled
+
+  # Shutdown must terminate, not stop, or EBS volumes keep costing money.
+  shutdown_behavior = var.enable_auto_termination ? "terminate" : "stop"
+}
+
 # Generate SSH key pair for EC2 instances
 resource "tls_private_key" "main" {
   algorithm = "RSA"
@@ -110,21 +148,34 @@ resource "aws_security_group" "wazuh_server" {
     description = "SSH access"
   }
 
-  # Wazuh Agent communication
+  # Wazuh agent communication and enrollment are VPC-internal only: the agent
+  # reaches the manager over private IPs (agent 172.31.x -> manager private IP),
+  # so these ports must not be exposed to the internet.
   ingress {
     from_port   = 1514
     to_port     = 1514
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Wazuh agent TCP"
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
+    description = "Wazuh agent TCP (VPC private only)"
   }
 
   ingress {
     from_port   = 1514
     to_port     = 1514
     protocol    = "udp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Wazuh agent UDP"
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
+    description = "Wazuh agent UDP (VPC private only)"
+  }
+
+  # Agent enrollment (authd). Without this the agent logs
+  # "Requesting a key from server" and never registers - 1514 alone is not
+  # enough, registration happens on 1515.
+  ingress {
+    from_port   = 1515
+    to_port     = 1515
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
+    description = "Wazuh agent enrollment authd (VPC private only)"
   }
 
   # Wazuh Dashboard (HTTPS)
@@ -143,6 +194,20 @@ resource "aws_security_group" "wazuh_server" {
     protocol    = "tcp"
     cidr_blocks = var.allowed_api_cidrs
     description = "Wazuh API"
+  }
+
+  # Wazuh indexer. Required only because Shuffle *Cloud* executes workflow nodes
+  # outside this VPC and must query the indexer directly.
+  # SECURITY: this exposes Elasticsearch to the internet. It is HTTP-basic
+  # authenticated, but for anything beyond a TTL-limited test either restrict
+  # this to Shuffle's egress ranges or run Shuffle self-hosted inside the VPC
+  # and drop this rule entirely.
+  ingress {
+    from_port   = 9200
+    to_port     = 9200
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_api_cidrs
+    description = "Wazuh indexer (Shuffle Cloud access)"
   }
 
   # Outbound - allow all
@@ -228,14 +293,14 @@ data "aws_ami" "ubuntu_server" {
   }
 }
 
-# Get Ubuntu 24.04 LTS AMI for Agent
+# Get Ubuntu 22.04 LTS AMI for Agent (using jammy as noble may not be available in all regions)
 data "aws_ami" "ubuntu_agent" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 
   filter {
@@ -273,9 +338,25 @@ resource "aws_instance" "wazuh_server" {
 
   monitoring = true
 
-  user_data = base64encode(templatefile("${path.module}/wazuh-server-init.sh", {
-    wazuh_version = var.wazuh_version
-  }))
+  instance_initiated_shutdown_behavior = local.shutdown_behavior
+
+  # Official Wazuh quickstart all-in-one install:
+  # https://documentation.wazuh.com/current/quickstart.html
+  user_data = base64encode(<<-EOF
+${local.ttl_prologue}
+set -euxo pipefail
+exec > >(tee -a /var/log/wazuh-install.log) 2>&1
+
+WAZUH_BRANCH="$(echo "${var.wazuh_version}" | cut -d. -f1,2)"
+cd /root
+curl -sO "https://packages.wazuh.com/$${WAZUH_BRANCH}/wazuh-install.sh"
+bash ./wazuh-install.sh -a -i
+
+# Persist generated admin credentials for retrieval
+tar -xf wazuh-install-files.tar -C /root 2>/dev/null || true
+echo "WAZUH_INSTALL_COMPLETE=$(date -Is)" > /root/WAZUH_READY
+EOF
+  )
 
   tags = {
     Name               = "wazuh-server"
@@ -315,12 +396,18 @@ resource "aws_instance" "wazuh_agent" {
     http_put_response_hop_limit = 1
   }
 
-  monitoring = true
+  monitoring                           = true
+  instance_initiated_shutdown_behavior = local.shutdown_behavior
 
-  user_data = base64encode(templatefile("${path.module}/wazuh-agent-init.sh", {
-    wazuh_server_ip = aws_instance.wazuh_server.private_ip
-    wazuh_version  = var.wazuh_version
-  }))
+  # TTL prologue is prepended so termination is scheduled before the install
+  # runs. The init script's own shebang becomes a harmless comment.
+  user_data = base64encode(join("\n", [
+    local.ttl_prologue,
+    templatefile("${path.module}/wazuh-agent-init.sh", {
+      wazuh_server_ip = aws_instance.wazuh_server.private_ip
+      wazuh_version   = var.wazuh_version
+    })
+  ]))
 
   tags = {
     Name               = "wazuh-agent"

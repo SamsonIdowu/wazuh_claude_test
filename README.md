@@ -27,7 +27,7 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 3. Save the file
 4. Message Claude: **"execute test"**
 5. Wait 20-40 minutes
-6. Check `Results/` folder for test outputs
+6. Check `results/` folder for test outputs
 
 ### Option 2: Manual Deployment
 
@@ -35,7 +35,7 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 2. Edit with your AWS credentials and IP address
 3. Run `cd terraform && terraform init && terraform apply`
 4. SSH to instances and manually run tests
-5. Document results in `Results/` folder
+5. Document results in `results/` folder
 
 ---
 
@@ -50,21 +50,23 @@ wazuh_test/
 │   ├── main.tf                        (EC2, security groups, networking)
 │   ├── variables.tf                   (Configurable parameters)
 │   ├── outputs.tf                     (Connection details)
-│   ├── wazuh-server-init.sh          (Server installation)
+│   ├── thehive.tf                     (TheHive EC2 + security group)
+│   ├── thehive-init.sh                (TheHive install via StrangeBee compose)
 │   ├── wazuh-agent-init.sh           (Agent installation)
 │   ├── terraform.tfvars.example       (Config template - copy this)
 │   └── terraform.tfvars               (Your config - create from example)
 ├── test/
-│   ├── AUTOMATED_TEST_TEMPLATE.md    (Self-executing test template)
-│   ├── EXECUTE_TEST_GUIDE.txt        (Quick start for automated tests)
+│   ├── AUTOMATED_TEST_TEMPLATE.md    (Fill in + say "execute test")
 │   ├── README.md                     (Test documentation index)
-│   ├── TTL_AND_AUTO_TERMINATION.md   (TTL management guide)
-│   └── TTL_SUMMARY.txt               (Quick reference)
-└── Results/                           (Test outputs - auto-generated)
+│   └── TTL_AND_AUTO_TERMINATION.md   (TTL management guide)
+├── DEPLOYMENT_RUNBOOK.md              (What works: procedures + gotchas)
+└── results/                           (Test outputs - auto-generated)
     ├── test-implementation-steps.md
     ├── test-verdict.md
-    ├── test-details.md
-    └── execution-log.txt
+    ├── execution-log.txt
+    ├── test-report.html / .pdf
+    └── deployment-outputs.md          (credentials/DNS/IP/certs - gitignored,
+                                        deleted by cleanup, never committed)
 ```
 
 ---
@@ -82,7 +84,7 @@ The automated test system dynamically adapts infrastructure to match your docume
 
 **Phase 2: Test Planning & Infrastructure Analysis (10 min)**
 - Generates `terraform/terraform.tfvars` from document requirements
-- Creates `Results/test-implementation-steps.md` with test procedures
+- Creates `results/test-implementation-steps.md` with test procedures
 - Plans resource configuration
 
 **Phase 3: Infrastructure Setup (10 min)**
@@ -96,9 +98,9 @@ The automated test system dynamically adapts infrastructure to match your docume
 - Captures all outputs
 
 **Phase 5: Results & Verdict (5 min)**
-- Creates `Results/test-verdict.md` (PASS/FAIL/PARTIAL)
-- Creates `Results/test-details.md` (detailed findings)
-- Generates `Results/execution-log.txt` (timeline)
+- Creates `results/test-verdict.md` (PASS/FAIL/PARTIAL, with a per-step evidence table)
+- Generates `results/execution-log.txt` (timeline, VERIFIED vs UNVERIFIED)
+- Generates `results/test-report.pdf` (general status, step-by-step, failed steps, recommendations)
 
 **Phase 6: Cleanup (auto-managed)**
 - Auto-terminates after 1 hour (default)
@@ -114,7 +116,7 @@ The automated test system dynamically adapts infrastructure to match your docume
 10:15 AM - Terraform deployment begins
 10:25 AM - Services ready, test execution starts
 10:40 AM - Tests complete
-10:45 AM - Results available in Results/ folder
+10:45 AM - Results available in results/ folder
 ```
 
 ### Key Architecture: Variable Infrastructure, Constant Tests
@@ -141,9 +143,9 @@ Message Claude: "execute test"
 
 **Step 3: View Results** (after 20-40 minutes)
 ```bash
-cat Results/test-verdict.md        # Pass/Fail summary
-cat Results/test-details.md        # Full findings
-cat Results/execution-log.txt      # Timeline
+cat results/test-verdict.md        # Pass/Fail summary + evidence table
+open results/test-report.pdf       # General status, step-by-step, failures, recommendations
+cat results/execution-log.txt      # Timeline
 ```
 
 ---
@@ -201,10 +203,15 @@ ssh -i wazuh-test-key.pem ubuntu@<server_public_dns>
 ```
 
 **Access Wazuh Dashboard:**
-```
-URL: https://<server_public_dns>
-User: admin
-Password: admin (default)
+
+The quickstart installer generates a random admin password per deployment — it
+is never `admin/admin`. During an automated run, the dashboard URL and
+credentials are written to `results/deployment-outputs.md` (gitignored,
+deleted by cleanup). For a manual deployment, retrieve the password directly:
+
+```bash
+ssh -i wazuh-test-key.pem ubuntu@<server_public_dns> \
+  "sudo tar -xOf /root/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt"
 ```
 
 **SSH to Agent:**
@@ -226,19 +233,16 @@ sudo tail -50 /var/ossec/logs/ossec.log
 
 ### Step 5: Run Tests
 
-Follow your test procedures from the blog post:
-1. Deploy EOL detector script
-2. Configure Wazuh rules
-3. Add log collectors
-4. Generate test data
-5. Verify alerts in dashboard
+Follow the procedures in `test/AUTOMATED_TEST_TEMPLATE.md` (Phases 4–5): verify
+the platform, execute each scenario from your source document, and confirm the
+effect rather than assuming the trigger worked.
 
 ### Step 6: Document Results
 
-Create test result files in `Results/`:
+Create test result files in `results/`:
 - `test-implementation-steps.md` — What you tested
-- `test-verdict.md` — PASS/FAIL/PARTIAL summary
-- `test-details.md` — Detailed findings
+- `test-verdict.md` — PASS/FAIL/PARTIAL summary with a per-step evidence table
+- `test-report.pdf` — General status, step-by-step status, failed steps, recommendations
 
 ---
 
@@ -342,31 +346,37 @@ terraform destroy
 
 ## 📊 Test Results
 
-Test results are stored in the `Results/` directory with these files:
+Test results are stored in the `results/` directory with these files:
 
 **test-implementation-steps.md**
 - What was tested
 - Infrastructure used
 - Configuration changes made
-- Blog post steps mapped to test procedures
+- Source document scenarios mapped to test procedures
 
 **test-verdict.md**
 - Overall result: PASS / FAIL / PARTIAL
 - Summary of findings
 - Recommendations for next steps
 
-**test-details.md**
-- Complete findings and logs
-- SSH command outputs
-- Configuration files used
-- Errors and solutions
-- Full audit trail
+**test-report.pdf**
+- General status table (verdict, steps passed, duration, cost, teardown state)
+- Step-by-step status table (command / expected / actual / status)
+- Failed steps table (symptom, root cause, fix, resolved)
+- Recommendations table (priority, area, recommendation, rationale)
 
 **execution-log.txt**
 - Timeline of all events
 - Phase completion times
-- Resource URLs and connection details
 - Service status at each step
+
+**deployment-outputs.md** *(sensitive — gitignored, deleted by cleanup)*
+- Every credential, DNS name, IP address, and cert path produced by the
+  deployment: dashboard/API URLs, generated passwords, SSH connection strings,
+  and any external integration credentials supplied for the test
+- Never referenced from `test-verdict.md` or committed anywhere — it exists
+  only so a human doesn't have to hunt through chat history or `terraform
+  output` for connection details during the test window
 
 ---
 
@@ -435,7 +445,7 @@ cd terraform
 terraform destroy
 
 # Remove test results
-rm -f Results/test-*.md Results/execution-log.txt
+rm -f results/test-*.md results/execution-log.txt
 
 # Reset terraform config
 rm terraform/terraform.tfvars
@@ -451,9 +461,13 @@ Claude will automatically clean up everything and prepare for the next test run.
 ### What Gets Cleaned vs What Stays
 
 **Cleaned:**
-- AWS infrastructure (EC2 instances, security groups, VPC resources)
-- Previous test results (implementation steps, verdict, details, logs)
-- Terraform state files and cache
+- AWS infrastructure (EC2 instances, security groups, VPC resources) — verified
+  against AWS after `terraform destroy`, not just the exit code
+- Previous test results (implementation steps, verdict, report, logs)
+- `results/deployment-outputs.md` — every credential, DNS name, IP and cert path
+  from the last run; removed every time, never left on disk between tests
+- Terraform state files and cache (including `.tfstate.backup`, which can retain
+  the generated SSH private key in plaintext)
 - User configuration (terraform.tfvars)
 
 **Stays:**
@@ -523,23 +537,6 @@ sudo ss -tlnp | grep 443
 aws ec2 describe-security-groups --group-names wazuh-server-sg
 ```
 
-### EOL Detector Script Fails
-
-```bash
-# SSH to server
-ssh -i wazuh-test-key.pem ubuntu@<server-dns>
-
-# Check script exists
-ls -la /var/ossec/integrations/eol_detector.py
-
-# Fix permissions
-sudo chown wazuh:wazuh /var/ossec/integrations/eol_detector.py
-sudo chmod 750 /var/ossec/integrations/eol_detector.py
-
-# Test manually
-sudo python3 /var/ossec/integrations/eol_detector.py 2>&1
-```
-
 ### Terraform State Issues
 
 ```bash
@@ -563,21 +560,23 @@ terraform refresh
 | **Start automated test** | Say "execute test" to Claude |
 | **Clean up & start fresh** | Say "cleanup test" or run `./cleanup.ps1` / `bash cleanup.sh` |
 | **SSH to server** | `ssh -i wazuh-test-key.pem ubuntu@<dns>` |
-| **Access dashboard** | `https://<server-dns>` (admin/admin) |
+| **Access dashboard** | `https://<server-dns>` — credentials in `results/deployment-outputs.md` |
 | **Extend TTL** | Edit `terraform/terraform.tfvars` → `terraform apply` |
 | **Destroy infrastructure** | `cd terraform && terraform destroy` |
-| **View test verdict** | `cat Results/test-verdict.md` |
-| **View test details** | `cat Results/test-details.md` |
-| **View execution log** | `cat Results/execution-log.txt` |
+| **View test verdict** | `cat results/test-verdict.md` |
+| **View PDF report** | `open results/test-report.pdf` |
+| **View execution log** | `cat results/execution-log.txt` |
 
 ---
 
 ## 📚 Documentation Files
 
-- **test/AUTOMATED_TEST_TEMPLATE.md** — Self-executing test template (edit to add Google Drive link)
-- **test/EXECUTE_TEST_GUIDE.txt** — Quick start guide for automated testing
-- **test/TTL_AND_AUTO_TERMINATION.md** — Complete Time-To-Live management guide
-- **test/TTL_SUMMARY.txt** — Quick reference card for TTL features
+- **test/AUTOMATED_TEST_TEMPLATE.md** — Fill in the source document, then say "execute test".
+  Product-agnostic; includes the rules (R1–R8) that keep a run honest and cheap.
+- **test/TTL_AND_AUTO_TERMINATION.md** — How self-termination works, and why the
+  previous cosmetic version cost ~$4.92 in forgotten instances
+- **DEPLOYMENT_RUNBOOK.md** — Worked Wazuh + TheHive example: every failure hit,
+  its root cause, and the fix. Read before editing the Terraform or init scripts.
 
 ---
 

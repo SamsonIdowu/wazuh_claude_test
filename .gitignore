@@ -48,6 +48,27 @@ __pycache__/
 .aws/credentials
 .aws/config
 
+# Credentials and secrets captured during test runs.
+# A generated results file once held a live Slack bot token and Shuffle API key
+# in plaintext; these patterns keep that out of git. Never commit real tokens.
+**/INTEGRATION_CREDENTIALS.md
+**/*credentials*.md
+**/*CREDENTIALS*.md
+**/*secret*
+**/*SECRET*
+**/*_api_key*
+**/*apikey*
+**/wazuh-passwords.txt
+**/wazuh-install-files*
+Results/credentials/
+results/credentials/
+
+# All deployment outputs (credentials, DNS, IPs, cert paths) for a test run -
+# written once per run, deleted at teardown. Never committed.
+results/deployment-outputs.md
+Results/deployment-outputs.md
+results/credentials/
+
 # Temporary files
 *.tmp
 *.temp
@@ -69,3 +90,6 @@ build/
 # Windows
 $RECYCLE.BIN/
 ehthumbs.db
+
+# Claude Code local overrides (may contain approved command strings)
+.claude/settings.local.json

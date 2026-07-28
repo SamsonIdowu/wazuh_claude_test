@@ -1,6 +1,12 @@
 # Test Results Directory
 # Files created here during automated test execution:
 # - test-implementation-steps.md    (What was tested)
-# - test-verdict.md                 (Pass/Fail/Partial verdict)
-# - test-details.md                 (Full findings and logs)
-# - execution-log.txt               (Timeline of execution)
+# - test-verdict.md                 (Pass/Fail/Partial verdict + evidence table)
+# - execution-log.txt               (Timeline, VERIFIED vs UNVERIFIED)
+# - test-report.html                (Printable source for the PDF)
+# - test-report.pdf                 (General status, step-by-step, failed
+#                                     steps, recommendations - 4 tables)
+# - deployment-outputs.md           (SENSITIVE - credentials, DNS, IPs, certs.
+#                                     Gitignored. Deleted at teardown, every
+#                                     time. Never referenced from the files
+#                                     above, which are meant to be shared.)

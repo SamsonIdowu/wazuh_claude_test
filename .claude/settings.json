@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.strangebee.com)",
+      "Bash(curl -s \"https://api.github.com/repos/StrangeBeeCorp/docker/contents/\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(x['type'][:3], x['name']\\) for x in d]\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/StrangeBeeCorp/docker/main/testing/README.md\")",
+      "Bash(curl -s \"https://api.github.com/repos/StrangeBeeCorp/docker/contents/testing/scripts\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(x['name']\\) for x in d]\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/StrangeBeeCorp/docker/main/testing/scripts/init.sh\")",
+      "Bash(cd \"C:\\\\Users\\\\olugb\\\\.claude\\\\projects\\\\c--Users-olugb-projects-wazuh-test\\\\memory\" && ls -la 2>&1; echo \"=== MEMORY.md ===\"; cat MEMORY.md 2>/dev/null || echo \"\\(does not exist yet\\)\")",
+      "Read(//c/Users/olugb/.claude/projects/c--Users-olugb-projects-wazuh-test/memory/**)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

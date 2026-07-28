@@ -20,13 +20,20 @@ echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4
 # Update package lists
 apt-get update -qq
 
-# Install Wazuh Agent
+# Install Wazuh Agent.
+# WAZUH_MANAGER is the documented way to set the manager address at install
+# time - the package substitutes it into ossec.conf for us.
 echo "Installing Wazuh Agent ${wazuh_version}..."
-apt-get install -y wazuh-agent=${wazuh_version}-* > /dev/null 2>&1
+WAZUH_MANAGER="${wazuh_server_ip}" apt-get install -y wazuh-agent=${wazuh_version}-* > /dev/null 2>&1
 
-# Configure agent to connect to Wazuh server
+# Belt-and-braces: if the placeholder survived, replace it explicitly.
+# The element is <address>MANAGER_IP</address> - NOT <manager_address>, which
+# does not exist in Wazuh 4.x agent configs. Targeting the wrong element makes
+# sed match nothing silently, leaving the literal placeholder and causing
+# "ERROR: (4112): Invalid server address found: 'MANAGER_IP'".
 echo "Configuring Wazuh Agent..."
-sed -i "s/<manager_address>127.0.0.1<\/manager_address>/<manager_address>${wazuh_server_ip}<\/manager_address>/" /var/ossec/etc/ossec.conf
+sed -i "s|<address>MANAGER_IP</address>|<address>${wazuh_server_ip}</address>|" /var/ossec/etc/ossec.conf
+grep -m1 '<address>' /var/ossec/etc/ossec.conf
 
 # Start and enable agent
 systemctl daemon-reload

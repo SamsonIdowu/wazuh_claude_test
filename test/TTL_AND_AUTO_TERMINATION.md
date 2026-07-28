@@ -1,239 +1,127 @@
-# Auto-Termination & TTL Management
+# TTL & Auto-Termination
 
-## ⏱️ Overview
+## How it works
 
-All deployed resources have a **1-hour (60 minute) default Time-To-Live (TTL)**. After this period, the infrastructure will be automatically terminated to prevent unexpected costs.
-
-```
-DEPLOYMENT → 1 HOUR → AUTO-TERMINATE (unless extended)
-```
-
-## 📊 Default Configuration
-
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `resource_ttl_minutes` | 60 | Resources terminate after 1 hour |
-| `enable_auto_termination` | true | Auto-termination is active |
-
-## ⏳ What Happens at Each Stage
-
-### During Deployment (terraform apply)
-1. ✅ Instances created with TTL tags
-2. ✅ Info file created: `TTL_AND_EXTENSION.txt`
-3. ✅ Terraform outputs show TTL countdown instructions
-
-### During Operation (0-60 minutes)
-1. ✅ You have full access to Wazuh Dashboard
-2. ✅ You can run tests and validation
-3. ⚠️ Timer counting down in background
-
-### At 60 Minutes
-1. ⏰ Termination window opens
-2. 📢 Resources are marked for termination
-3. 🛑 Auto-cleanup will occur
-
-## 🛑 Preventing Termination
-
-You have three options:
-
-### Option 1: Extend TTL (Recommended for continuing work)
-
-**Steps:**
-1. Edit `terraform/terraform.tfvars`
-2. Change the TTL value:
-   ```hcl
-   resource_ttl_minutes = 120  # Extend to 2 hours
-   ```
-3. Run:
-   ```bash
-   cd terraform
-   terraform apply
-   ```
-
-**Result:** Resources continue for another hour (or your specified duration)
-
----
-
-### Option 2: Disable Auto-Termination (For long-running tests)
-
-**Steps:**
-1. Edit `terraform/terraform.tfvars`
-2. Add/modify:
-   ```hcl
-   enable_auto_termination = false
-   ```
-3. Run:
-   ```bash
-   cd terraform
-   terraform apply
-   ```
-
-**Result:** Resources run indefinitely (manually destroy when done)
-
----
-
-### Option 3: Cleanup Immediately
-
-**Steps:**
-```bash
-cd terraform
-terraform destroy
-```
-
-**Result:** All resources immediately terminated and cleaned up
-
----
-
-## 📝 Common Scenarios
-
-### Scenario 1: Running Tests (0-30 min)
-```
-Time: 0-30 min
-Action: Run your tests normally
-TTL: No action needed
-```
-
-### Scenario 2: Tests Taking Longer Than Expected
-```
-Time: 50 minutes elapsed
-Action: Extend TTL to 120 minutes
-Command: 
-  terraform/terraform.tfvars → resource_ttl_minutes = 120
-  terraform apply
-Result: Continue testing for another hour
-```
-
-### Scenario 3: Completed, Need Cleanup
-```
-Time: 45 minutes elapsed
-Action: Destroy resources
-Command: terraform destroy
-Result: Immediate cleanup, stop paying
-```
-
-### Scenario 4: Multi-Phase Testing
-```
-Time: 0 min    → Deploy (TTL = 60 min)
-Time: 30 min   → Testing phase 1 complete
-Time: 50 min   → Extend to 120 min
-Time: 100 min  → Testing phase 2 complete
-Time: 110 min  → Destroy
-```
-
----
-
-## 🔧 Terraform Variables Reference
-
-### resource_ttl_minutes
-- **Type:** number
-- **Default:** 60
-- **Range:** 1-1440 (1 minute to 1 day)
-- **Effect:** Controls auto-termination time
-- **Example:**
-  ```hcl
-  resource_ttl_minutes = 180  # 3 hours
-  ```
-
-### enable_auto_termination
-- **Type:** boolean
-- **Default:** true
-- **Effect:** Enables/disables auto-termination
-- **Example:**
-  ```hcl
-  enable_auto_termination = false  # Never auto-terminate
-  ```
-
----
-
-## 📋 Instance Tags
-
-All instances are tagged with:
-- `TTL_Minutes` - The TTL value in minutes
-- `AutoTermination` - Whether auto-termination is enabled
-- `CreatedAt` - Timestamp of creation
-
-View tags via AWS Console:
-1. Go to EC2 → Instances
-2. Select instance
-3. Tags tab shows TTL information
-
----
-
-## 💰 Cost Implications
-
-### Example Cost Breakdown (1 Hour Default)
-
-| Resource | Price/Hour | 1-Hour Cost | Notes |
-|----------|-----------|-----------|-------|
-| Wazuh Server (t3.xlarge) | $0.1664 | ~$0.17 | Testing |
-| Agent (t3.medium) | $0.0416 | ~$0.04 | Testing |
-| EBS Volumes | ~$0.003 | <$0.01 | 50GB total |
-| **Total** | | **~$0.22** | Per 1-hour run |
-
-**Extended to 2 hours:** ~$0.44
-**Extended to 4 hours:** ~$0.88
-
----
-
-## ⚠️ Important Notes
-
-### Auto-Termination Behavior
-- ✅ Works transparently in background
-- ✅ Terraform state is updated to reflect TTL
-- ✅ All AWS resources are properly terminated
-- ✅ Volumes and snapshots are deleted
-
-### No Response = Cleanup
-- After TTL expires with `enable_auto_termination = true`
-- Resources are automatically destroyed
-- No notification emails are sent
-- No additional action required to cleanup
-
-### Manual Control Always Available
-- You can always extend TTL
-- You can always disable auto-termination
-- You can always destroy manually
-- Full control remains with terraform commands
-
----
-
-## 🚀 Workflow Example
+Every instance schedules its own termination in `user_data`, as the very first
+action, before any installation work:
 
 ```bash
-# 1. Deploy with default 1-hour TTL
-cd terraform
-terraform apply
+/sbin/shutdown -h +${resource_ttl_minutes}
+```
 
-# 2. Work for 30 minutes
-# ... run tests, configure EOL detection ...
+paired with:
 
-# 3. Realize you need more time (50 minutes elapsed)
-# Edit terraform/terraform.tfvars:
-#   resource_ttl_minutes = 120
+```hcl
+instance_initiated_shutdown_behavior = "terminate"
+```
 
-# 4. Extend the TTL
-terraform apply
+Both halves are required:
 
-# 5. Continue work for another hour
-# ... more testing ...
+- **`shutdown -h +N` runs first**, so a hung or failed install still terminates
+  on schedule. If it were appended after the install, a failure would leave the
+  instance running forever — which is exactly what happened before.
+- **`instance_initiated_shutdown_behavior = "terminate"`** makes the shutdown
+  terminate rather than *stop* the instance. A stopped instance still bills for
+  its EBS volumes.
 
-# 6. All done, cleanup
-terraform destroy
+The mechanism is deliberately local and dumb: no Lambda, no external scheduler,
+nothing that can fail silently outside the instance. The instance kills itself.
+
+Verify it was actually scheduled:
+
+```bash
+ssh -i wazuh-test-key.pem ubuntu@<IP> "sudo cat /root/TTL_SCHEDULED; shutdown --show"
 ```
 
 ---
 
-## 📞 Quick Reference
+## History — why this document is emphatic
 
-| Need | Command |
-|------|---------|
-| Check TTL status | `terraform output resource_ttl_minutes` |
-| Extend TTL | Edit `.tfvars` → `terraform apply` |
-| Disable auto-termination | Edit `.tfvars` → `terraform apply` |
-| Destroy immediately | `terraform destroy` |
-| View instance tags | AWS Console → EC2 → Instances → Tags |
+This file previously claimed:
+
+> "All deployed resources have a 1-hour default TTL. After this period, the
+> infrastructure will be automatically terminated to prevent unexpected costs."
+
+**That was false.** `resource_ttl_minutes` and `enable_auto_termination` produced
+only two things:
+
+1. `TTL_AND_EXTENSION.txt`, a local text file *asserting* auto-termination
+2. EC2 tags `TTL_Minutes` and `AutoTermination` — inert metadata
+
+No Lambda. No CloudWatch alarm. No scheduled shutdown. Nothing read those tags.
+The variables described an intention that no code implemented, and both this
+document and the Terraform outputs reported it as though it were real.
+
+Consequence: a test run set to a 240-minute TTL ran for **17 hours** and cost
+**~$4.92** before being noticed and destroyed manually. Tags and documentation
+are not enforcement.
 
 ---
 
-**Last Updated:** 2026-07-27
-**Version:** 1.0
+## Configuration
+
+| Variable | Default | Effect |
+|---|---|---|
+| `resource_ttl_minutes` | 240 | Minutes until self-termination (1–1440) |
+| `enable_auto_termination` | `true` | `false` disables the shutdown and sets behaviour to `stop` |
+
+### Extending the TTL
+
+Editing the variable only affects **new** instances. `user_data` runs once, on
+first boot, so changing it does not reschedule a running instance.
+
+To extend a *running* instance, reschedule on the box itself:
+
+```bash
+sudo shutdown -c                # cancel the pending shutdown
+sudo shutdown -h +480           # reschedule for 8 hours
+```
+
+To change the default for future deploys, edit `terraform/terraform.tfvars`:
+
+```hcl
+resource_ttl_minutes = 480
+```
+
+### Disabling auto-termination
+
+```hcl
+enable_auto_termination = false
+```
+
+With this set you are responsible for teardown. Nothing will stop the billing.
+
+---
+
+## Teardown is still your responsibility
+
+The TTL is a safety net against *forgetting*, not a substitute for cleanup.
+When a test finishes:
+
+```bash
+cd terraform && terraform destroy -auto-approve
+```
+
+Then confirm against AWS rather than trusting the Terraform output:
+
+```bash
+aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=wazuh-server,wazuh-agent,thehive-server" \
+  --region us-east-1 \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name]' --output table
+
+# Orphaned volumes bill even with no instances:
+aws ec2 describe-volumes --region us-east-1 \
+  --filters "Name=status,Values=available" --output table
+```
+
+---
+
+## Cost reference (us-east-1 on-demand)
+
+| Instance | Type | Rate |
+|---|---|---|
+| Wazuh server | t3.xlarge | ~$0.1664/hr |
+| Wazuh agent | t3.medium | ~$0.0416/hr |
+| TheHive | t3.large | ~$0.0832/hr |
+| **Combined** | | **~$0.29/hr (~$7/day)** |
