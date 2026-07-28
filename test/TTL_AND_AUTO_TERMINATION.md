@@ -105,14 +105,21 @@ cd terraform && terraform destroy -auto-approve
 Then confirm against AWS rather than trusting the Terraform output:
 
 ```bash
-aws ec2 describe-instances \
+aws ec2 describe-instances --profile wazuh \
   --filters "Name=tag:Name,Values=wazuh-server,wazuh-agent,thehive-server" \
   --region us-east-1 \
   --query 'Reservations[].Instances[].[InstanceId,State.Name]' --output table
 
 # Orphaned volumes bill even with no instances:
-aws ec2 describe-volumes --region us-east-1 \
+aws ec2 describe-volumes --profile wazuh --region us-east-1 \
   --filters "Name=status,Values=available" --output table
+
+# Also sweep account-wide: tag-filtered checks alone missed an older,
+# differently-tagged deployment that ran for 24 hours before being found.
+aws ec2 describe-instances --profile wazuh --region us-east-1 \
+  --filters "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].[InstanceId,Tags[?Key==`Name`]|[0].Value,State.Name]' \
+  --output table
 ```
 
 ---

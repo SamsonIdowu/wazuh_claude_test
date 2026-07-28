@@ -103,7 +103,7 @@ The automated test system dynamically adapts infrastructure to match your docume
 - Generates `results/test-report.pdf` (general status, step-by-step, failed steps, recommendations)
 
 **Phase 6: Cleanup (auto-managed)**
-- Auto-terminates after 1 hour (default)
+- Auto-terminates after 4 hours (default), genuinely enforced
 - Or extend TTL in `terraform/terraform.tfvars`
 - Or manual `terraform destroy`
 
@@ -170,12 +170,13 @@ Edit `terraform/terraform.tfvars`:
 
 ```hcl
 aws_region                  = "us-east-1"
+aws_profile                = "wazuh"     # named profile in ~/.aws/credentials
 wazuh_version              = "4.14.6"
 wazuh_server_instance_type = "t3.xlarge"
 agent_instance_type        = "t3.medium"
 allowed_ssh_cidrs          = ["YOUR_IP/32"]
 allowed_api_cidrs          = ["YOUR_IP/32"]
-resource_ttl_minutes       = 60          # 1 hour default
+resource_ttl_minutes       = 240         # 4 hour default
 enable_auto_termination    = true        # Auto-cleanup enabled
 ```
 
@@ -296,7 +297,8 @@ wazuh_version = "4.14.6"  # Updates Manager, Dashboard, Indexer, Agent
 
 ### TTL (Time-To-Live)
 
-**Default:** 1 hour with auto-termination
+**Default:** 4 hours with auto-termination, genuinely enforced (see
+`test/TTL_AND_AUTO_TERMINATION.md`) — not just a tag or a doc claim.
 
 ### Extend TTL
 
@@ -387,6 +389,7 @@ Test results are stored in the `results/` directory with these files:
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `aws_region` | string | us-east-1 | AWS region for deployment |
+| `aws_profile` | string | wazuh | Named AWS CLI profile from `~/.aws/credentials` |
 | `wazuh_version` | string | 4.14.6 | Wazuh version (all components) |
 
 ### Instance Configuration
@@ -409,7 +412,7 @@ Test results are stored in the `results/` directory with these files:
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `resource_ttl_minutes` | number | 60 | Auto-termination timeout (1-1440 minutes) |
+| `resource_ttl_minutes` | number | 240 | Auto-termination timeout (1-1440 minutes) |
 | `enable_auto_termination` | bool | true | Enable automatic resource cleanup |
 
 ---
@@ -487,11 +490,11 @@ Claude will automatically clean up everything and prepare for the next test run.
 cd terraform
 terraform plan
 
-# Verify AWS credentials
-aws sts get-caller-identity
+# Verify AWS credentials resolve to the expected account
+aws sts get-caller-identity --profile wazuh
 
 # Check regional resources
-aws ec2 describe-vpcs --region us-east-1
+aws ec2 describe-vpcs --region us-east-1 --profile wazuh
 ```
 
 ### SSH Connection Fails
@@ -501,10 +504,10 @@ aws ec2 describe-vpcs --region us-east-1
 ls -la wazuh-test-key.pem
 
 # Check security group
-aws ec2 describe-security-groups --group-names wazuh-server-sg
+aws ec2 describe-security-groups --group-names wazuh-server-sg --profile wazuh
 
 # Wait for instance readiness
-aws ec2 describe-instance-status --instance-ids <instance-id>
+aws ec2 describe-instance-status --instance-ids <instance-id> --profile wazuh
 ```
 
 ### Wazuh Services Not Running
@@ -534,7 +537,7 @@ sudo systemctl status wazuh-dashboard
 sudo ss -tlnp | grep 443
 
 # Verify security group allows 443
-aws ec2 describe-security-groups --group-names wazuh-server-sg
+aws ec2 describe-security-groups --group-names wazuh-server-sg --profile wazuh
 ```
 
 ### Terraform State Issues

@@ -62,6 +62,28 @@ Yields two distinct accounts:
 - `admin` → dashboard + indexer
 - `wazuh-wui` → API on `:55000`
 
+### Indexer binds to localhost only — confirmed recurring, not a fluke
+
+The quickstart installer sets `network.host: "127.0.0.1"` in
+`/etc/wazuh-indexer/opensearch.yml`. If the indexer needs to be reachable
+externally (e.g. for Shuffle Cloud, or any client outside the VPC), opening
+port 9200 in the security group is **not enough** — this happened identically
+on two separate deployments. Fix and confirm it comes back up before trusting
+it:
+
+```bash
+sudo sed -i 's|^network.host: .*|network.host: "0.0.0.0"|' \
+  /etc/wazuh-indexer/opensearch.yml
+sudo systemctl restart wazuh-indexer
+sudo systemctl is-active wazuh-indexer   # wait for "active", don't assume
+```
+
+This is now applied automatically in `terraform/main.tf`'s `wazuh_server`
+`user_data`, immediately after `wazuh-install.sh` runs and before the
+`WAZUH_READY` marker is written — so a fresh deploy shouldn't need this
+manual step again. If it recurs a third time, the fix belongs upstream in the
+installer's defaults, not in this repo's workaround.
+
 ### Verify (do not assume)
 
 ```bash

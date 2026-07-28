@@ -5,31 +5,36 @@
 # "An argument named ... is not expected here" on any stale name, so keep the
 # two files in sync when adding variables.
 #
-# AWS credentials are NOT set here. Use ~/.aws/credentials, environment
-# variables, or an instance role. Never put keys in this file - it is committed.
+# AWS credentials are NOT set here. This repo authenticates via a named
+# profile in ~/.aws/credentials:
+#   [wazuh]
+#   aws_access_key_id     = ...
+#   aws_secret_access_key = ...
+# Never put keys in this file - it is committed. Verify the profile resolves
+# to the account you expect before applying:
+#   aws sts get-caller-identity --profile wazuh
 
 # ---- General -------------------------------------------------------------
 aws_region    = "us-east-1"
+aws_profile   = "wazuh" # named profile in ~/.aws/credentials, not the account default
 wazuh_version = "4.14.6" # applies to manager, indexer, dashboard and agent
 
 # ---- Wazuh server (manager + indexer + dashboard, all-in-one) ------------
 wazuh_server_instance_type = "t3.xlarge"
 wazuh_server_volume_size   = 30
 
-# ---- Wazuh agent (monitored endpoint) -----------------------------------
-agent_instance_type = "t3.medium"
-agent_volume_size   = 20
-
-# ---- TheHive (Cassandra + Elasticsearch + TheHive) ----------------------
-# t3.large minimum: three JVM heaps (~1G each) do not fit in t3.medium's 4G.
-thehive_instance_type = "t3.large"
-thehive_volume_size   = 30
+# ---- Wazuh agent + TheHive endpoint (colocated, per infrastructure guide) -
+# t3.xlarge / 50GB: 16GB RAM, 4 vCPU per the guide's spec. TheHive alone needs
+# ~3G across Cassandra+Elasticsearch+TheHive JVM heaps; this leaves headroom.
+agent_instance_type = "t3.xlarge"
+agent_volume_size   = 50
 
 # ---- Security -----------------------------------------------------------
 # 0.0.0.0/0 is convenient for a short test but exposes these ports to the
 # internet. Prefer ["YOUR.IP.ADDR.ESS/32"].
 # Note: agent traffic (1514) and enrolment (1515) are always restricted to the
-# VPC CIDR in main.tf and are not configurable here.
+# VPC CIDR in main.tf and are not configurable here. TheHive's port 9000 on
+# the agent+TheHive endpoint is always public, per the infrastructure guide.
 allowed_ssh_cidrs = ["0.0.0.0/0"] # SSH (22)
 allowed_api_cidrs = ["0.0.0.0/0"] # Wazuh API (55000) and indexer (9200)
 

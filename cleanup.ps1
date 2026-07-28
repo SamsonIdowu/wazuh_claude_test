@@ -1,4 +1,4 @@
-# Cleanup Test Files and Infrastructure
+﻿# Cleanup Test Files and Infrastructure
 # This script cleans up after a test run
 
 Write-Host "╔════════════════════════════════════════════════════════════╗"
@@ -36,15 +36,18 @@ Write-Host "Step 1b: Verifying teardown against AWS (don't trust the exit code a
 Write-Host ""
 
 $region = "us-east-1"
+$profile = "wazuh"
 $tfvarsPath = "terraform/terraform.tfvars"
 if (Test-Path $tfvarsPath) {
     $match = Select-String -Path $tfvarsPath -Pattern 'aws_region\s*=\s*"([^"]+)"' -ErrorAction SilentlyContinue
     if ($match) { $region = $match.Matches[0].Groups[1].Value }
+    $matchProfile = Select-String -Path $tfvarsPath -Pattern 'aws_profile\s*=\s*"([^"]+)"' -ErrorAction SilentlyContinue
+    if ($matchProfile) { $profile = $matchProfile.Matches[0].Groups[1].Value }
 }
 
 $awsCmd = Get-Command aws -ErrorAction SilentlyContinue
 if ($awsCmd) {
-    $remaining = & aws ec2 describe-instances --region $region `
+    $remaining = & aws ec2 describe-instances --region $region --profile $profile `
         --filters "Name=tag:Name,Values=wazuh-server,wazuh-agent,thehive-server" `
                   "Name=instance-state-name,Values=pending,running,stopping,stopped" `
         --query 'Reservations[].Instances[].InstanceId' --output text 2>$null

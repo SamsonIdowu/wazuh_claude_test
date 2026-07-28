@@ -44,3 +44,4 @@ sleep 5
 
 echo "Wazuh Agent ${wazuh_version} Installation Complete"
 echo "Manager: ${wazuh_server_ip}:1514"
+echo "WAZUH_AGENT_READY=$(date -Is)" > /root/WAZUH_AGENT_READY

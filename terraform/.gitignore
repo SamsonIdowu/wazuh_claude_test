@@ -14,6 +14,10 @@ credentials/
 access_key.txt
 secret_key.txt
 
+# Per-deployment generated artifact (local_file.ttl_info in main.tf) -
+# recreated on every apply, not meant to be tracked.
+TTL_AND_EXTENSION.txt
+
 # IDE
 .idea/
 .vscode/

@@ -112,10 +112,24 @@ vendor script for unattended use, check for interactive prompts —
 
 ### R6 — Confirm teardown against the cloud provider, not the tool
 
+Add `--profile <name>` if the project isn't using the AWS CLI default profile —
+check `terraform/terraform.tfvars` for `aws_profile` before running these.
+
 ```bash
 aws ec2 describe-instances --filters "Name=tag:Name,Values=..." \
   --query 'Reservations[].Instances[].[InstanceId,State.Name]' --output table
 aws ec2 describe-volumes --filters "Name=status,Values=available"   # orphans bill
+```
+
+Also sweep account-wide, not just for the tags this project sets — an earlier
+run left two untagged-to-this-scheme instances running for 24 hours because
+the narrow, tag-filtered check alone didn't catch them:
+
+```bash
+aws ec2 describe-instances \
+  --filters "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].[InstanceId,Tags[?Key==`Name`]|[0].Value,State.Name]' \
+  --output table
 ```
 
 ### R7 — Never commit secrets

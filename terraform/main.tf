@@ -16,7 +16,8 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile
 }
 
 # ---------------------------------------------------------------------------
@@ -223,10 +224,10 @@ resource "aws_security_group" "wazuh_server" {
   }
 }
 
-# Security Group for Agent Endpoint
+# Security Group for the combined Wazuh agent + TheHive endpoint
 resource "aws_security_group" "wazuh_agent" {
   name        = "wazuh-agent-sg"
-  description = "Security group for Wazuh agent endpoint"
+  description = "Security group for Wazuh agent + TheHive endpoint"
   vpc_id      = data.aws_vpc.default.id
 
   # SSH from your IP
@@ -245,6 +246,15 @@ resource "aws_security_group" "wazuh_agent" {
     protocol        = "tcp"
     security_groups = [aws_security_group.wazuh_server.id]
     description     = "Wazuh agent from manager"
+  }
+
+  # TheHive web interface - publicly accessible per the infrastructure guide.
+  ingress {
+    from_port   = 9000
+    to_port     = 9000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "TheHive web interface"
   }
 
   # Outbound - allow all
@@ -293,14 +303,18 @@ data "aws_ami" "ubuntu_server" {
   }
 }
 
-# Get Ubuntu 22.04 LTS AMI for Agent (using jammy as noble may not be available in all regions)
+# Get Ubuntu 24.04 LTS (noble) AMI for the agent+TheHive endpoint, per the
+# infrastructure guide's explicit "Ubuntu 24 endpoint" requirement.
+# Canonical's 24.04 AMIs live under hvm-ssd-gp3, not the plain hvm-ssd path
+# used for 22.04 above - a glob without the wildcard after hvm-ssd returns no
+# results and looks like "24.04 isn't available in this region", which it is.
 data "aws_ami" "ubuntu_agent" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*"]
   }
 
   filter {
@@ -352,6 +366,17 @@ cd /root
 curl -sO "https://packages.wazuh.com/$${WAZUH_BRANCH}/wazuh-install.sh"
 bash ./wazuh-install.sh -a -i
 
+# The quickstart installer binds the indexer to network.host: 127.0.0.1, so
+# it is unreachable externally even with the security group open on 9200 -
+# confirmed twice now, not a one-off. Rebind and confirm it comes back active
+# before declaring the deployment ready.
+sed -i 's|^network.host: .*|network.host: "0.0.0.0"|' /etc/wazuh-indexer/opensearch.yml
+systemctl restart wazuh-indexer
+for i in $(seq 1 12); do
+  systemctl is-active --quiet wazuh-indexer && break
+  sleep 5
+done
+
 # Persist generated admin credentials for retrieval
 tar -xf wazuh-install-files.tar -C /root 2>/dev/null || true
 echo "WAZUH_INSTALL_COMPLETE=$(date -Is)" > /root/WAZUH_READY
@@ -369,7 +394,20 @@ EOF
   depends_on = [aws_security_group.wazuh_server]
 }
 
-# Wazuh Agent EC2 Instance
+# Combined Wazuh Agent + TheHive EC2 Instance
+#
+# Per the infrastructure guide, TheHive runs on the SAME Ubuntu 24 endpoint as
+# the Wazuh agent, not on a dedicated instance. user_data runs three chunks in
+# sequence in a single boot script:
+#   1. TTL prologue (schedules self-termination first, per REAL TTL ENFORCEMENT above)
+#   2. wazuh-agent-init.sh (templatefile - needs wazuh_server_ip/wazuh_version
+#      interpolated by Terraform)
+#   3. thehive-init.sh (file() - contains literal shell ${VAR} that must survive
+#      Terraform untouched; see that file's own header for why upstream's
+#      StrangeBee compose is used instead of a hand-written one)
+# A bare "#!/bin/bash" appearing after the first line of a script is just a
+# comment to bash, so concatenating three self-contained scripts this way is
+# safe - each one's `set -e`/`exec > >(tee ...)` applies from that point on.
 resource "aws_instance" "wazuh_agent" {
   ami                    = data.aws_ami.ubuntu_agent.id
   instance_type          = var.agent_instance_type
@@ -399,22 +437,21 @@ resource "aws_instance" "wazuh_agent" {
   monitoring                           = true
   instance_initiated_shutdown_behavior = local.shutdown_behavior
 
-  # TTL prologue is prepended so termination is scheduled before the install
-  # runs. The init script's own shebang becomes a harmless comment.
   user_data = base64encode(join("\n", [
     local.ttl_prologue,
     templatefile("${path.module}/wazuh-agent-init.sh", {
       wazuh_server_ip = aws_instance.wazuh_server.private_ip
       wazuh_version   = var.wazuh_version
-    })
+    }),
+    file("${path.module}/thehive-init.sh")
   ]))
 
   tags = {
-    Name               = "wazuh-agent"
-    Purpose            = "EOL Detection Test Endpoint"
-    TTL_Minutes        = var.resource_ttl_minutes
-    AutoTermination    = var.enable_auto_termination
-    CreatedAt          = timestamp()
+    Name            = "wazuh-agent"
+    Purpose         = "Wazuh Agent + TheHive Endpoint"
+    TTL_Minutes     = var.resource_ttl_minutes
+    AutoTermination = var.enable_auto_termination
+    CreatedAt       = timestamp()
   }
 
   depends_on = [aws_instance.wazuh_server]

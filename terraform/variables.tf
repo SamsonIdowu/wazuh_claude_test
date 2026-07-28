@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_profile" {
+  description = "Named AWS CLI profile to authenticate with (from ~/.aws/credentials)"
+  type        = string
+  default     = "wazuh"
+}
+
 variable "ssh_key_output_path" {
   description = "Path where SSH key will be saved"
   type        = string
@@ -35,15 +41,15 @@ variable "wazuh_server_volume_size" {
 }
 
 variable "agent_instance_type" {
-  description = "Instance type for Wazuh agent"
+  description = "Instance type for the Ubuntu endpoint (Wazuh agent + TheHive, colocated). t3.xlarge = 4 vCPU / 16GB RAM per the infrastructure guide."
   type        = string
-  default     = "t3.medium"
+  default     = "t3.xlarge"
 }
 
 variable "agent_volume_size" {
-  description = "Root volume size for agent (GB)"
+  description = "Root volume size for the agent+TheHive endpoint (GB). 50GB per the infrastructure guide."
   type        = number
-  default     = 20
+  default     = 50
 }
 
 variable "wazuh_version" {
@@ -55,7 +61,7 @@ variable "wazuh_version" {
 variable "resource_ttl_minutes" {
   description = "Time-to-live for resources in minutes. Resources auto-terminate after this time."
   type        = number
-  default     = 60  # 1 hour default
+  default     = 240  # 4 hour default
 
   validation {
     condition     = var.resource_ttl_minutes > 0 && var.resource_ttl_minutes <= 1440
@@ -67,16 +73,4 @@ variable "enable_auto_termination" {
   description = "Enable automatic resource termination after TTL expires"
   type        = bool
   default     = true
-}
-
-variable "thehive_instance_type" {
-  description = "Instance type for TheHive server"
-  type        = string
-  default     = "t3.medium"
-}
-
-variable "thehive_volume_size" {
-  description = "Root volume size for TheHive server (GB)"
-  type        = number
-  default     = 20
 }

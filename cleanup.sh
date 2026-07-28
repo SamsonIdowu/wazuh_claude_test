@@ -41,9 +41,11 @@ echo ""
 
 region=$(grep -oE 'aws_region\s*=\s*"[^"]+"' terraform/terraform.tfvars 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"')
 region=${region:-us-east-1}
+profile=$(grep -oE 'aws_profile\s*=\s*"[^"]+"' terraform/terraform.tfvars 2>/dev/null | grep -oE '"[^"]+"' | tr -d '"')
+profile=${profile:-wazuh}
 
 if command -v aws >/dev/null 2>&1; then
-    remaining=$(aws ec2 describe-instances --region "$region" \
+    remaining=$(aws ec2 describe-instances --region "$region" --profile "$profile" \
         --filters "Name=tag:Name,Values=wazuh-server,wazuh-agent,thehive-server" \
                   "Name=instance-state-name,Values=pending,running,stopping,stopped" \
         --query 'Reservations[].Instances[].InstanceId' --output text 2>/dev/null)

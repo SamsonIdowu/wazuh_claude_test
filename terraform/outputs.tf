@@ -53,6 +53,18 @@ output "wazuh_api_url" {
   value       = "https://${aws_instance.wazuh_server.public_dns}:55000"
 }
 
+output "wazuh_indexer_url" {
+  description = "Wazuh indexer URL (opened for external SOAR/API access)"
+  value       = "https://${aws_instance.wazuh_server.public_dns}:9200"
+}
+
+# TheHive runs on the same instance as the Wazuh agent, per the infrastructure
+# guide - there is no separate TheHive instance.
+output "thehive_url" {
+  description = "TheHive web interface URL"
+  value       = "http://${aws_instance.wazuh_agent.public_dns}:9000/thehive/login"
+}
+
 output "wazuh_server_instance_id" {
   description = "Wazuh server instance ID"
   value       = aws_instance.wazuh_server.id
