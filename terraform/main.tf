@@ -385,7 +385,8 @@ EOF
 
   tags = {
     Name               = "wazuh-server"
-    Purpose            = "EOL Detection Testing"
+    Purpose            = "Wazuh ${var.wazuh_version} Testing"
+    Scenario           = var.test_scenario
     TTL_Minutes        = var.resource_ttl_minutes
     AutoTermination    = var.enable_auto_termination
     CreatedAt          = timestamp()
@@ -455,4 +456,194 @@ resource "aws_instance" "wazuh_agent" {
   }
 
   depends_on = [aws_instance.wazuh_server]
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 5: OUTPUTS — COST TRACKING & DEPLOYMENT INFORMATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+output "wazuh_server_public_ip" {
+  description = "Public IP address of Wazuh server"
+  value       = aws_instance.wazuh_server.public_ip
+}
+
+output "wazuh_server_public_dns" {
+  description = "Public DNS name of Wazuh server"
+  value       = aws_instance.wazuh_server.public_dns
+}
+
+output "wazuh_server_private_ip" {
+  description = "Private IP address of Wazuh server (for agent communication)"
+  value       = aws_instance.wazuh_server.private_ip
+}
+
+output "wazuh_agent_public_ip" {
+  description = "Public IP address of Wazuh agent (+ TheHive endpoint)"
+  value       = aws_instance.wazuh_agent.public_ip
+}
+
+output "wazuh_agent_public_dns" {
+  description = "Public DNS name of Wazuh agent instance"
+  value       = aws_instance.wazuh_agent.public_dns
+}
+
+output "ssh_to_wazuh_server" {
+  description = "SSH command to connect to Wazuh server"
+  value       = "ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_server.public_dns}"
+}
+
+output "ssh_to_wazuh_agent" {
+  description = "SSH command to connect to Wazuh agent"
+  value       = "ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_agent.public_dns}"
+}
+
+output "dashboard_url" {
+  description = "URL to access Wazuh dashboard"
+  value       = "https://${aws_instance.wazuh_server.public_dns}"
+}
+
+output "api_endpoint" {
+  description = "Wazuh API endpoint"
+  value       = "https://${aws_instance.wazuh_server.public_dns}:55000/api"
+}
+
+output "thehive_url" {
+  description = "URL to access TheHive interface"
+  value       = "http://${aws_instance.wazuh_agent.public_dns}:9000"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# COST TRACKING
+# ═══════════════════════════════════════════════════════════════════════════
+
+output "estimated_hourly_cost" {
+  description = "Estimated hourly cost based on instance types"
+  value = {
+    wazuh_server     = "t3.xlarge: $0.1664/hour"
+    wazuh_agent      = "t3.large: $0.0832/hour"
+    ebs_gp3_volumes  = "~$0.10/hour (server 30GB + agent 20GB)"
+    total_per_hour   = "~$0.35/hour"
+  }
+}
+
+output "estimated_deployment_cost" {
+  description = "Estimated cost for full infrastructure deployment (45 minutes)"
+  value = {
+    deployment_time_minutes = 45
+    wazuh_server            = "$0.125 (45 min)"
+    wazuh_agent             = "$0.062 (45 min)"
+    ebs_volumes             = "$0.075 (45 min)"
+    total_estimated         = "$0.262 (~45 minutes at default TTL)"
+  }
+}
+
+output "ttl_configuration" {
+  description = "Time-To-Live and auto-termination configuration"
+  value = {
+    ttl_minutes           = var.resource_ttl_minutes
+    auto_termination      = var.enable_auto_termination
+    termination_behavior  = local.shutdown_behavior
+    deployment_timestamp  = timestamp()
+    auto_cleanup_time     = "In ${var.resource_ttl_minutes} minutes"
+    cost_impact_of_ttl    = "Ensures instances terminate automatically, preventing accidental runaway costs"
+  }
+}
+
+output "cost_optimization_tips" {
+  description = "Tips to optimize testing costs"
+  value = [
+    "1. Use test_scenario variable to deploy only needed resources (each scenario has cost estimate)",
+    "2. Default TTL of 60 minutes (~$0.21) covers most test scenarios",
+    "3. Extend TTL only if testing takes longer (edit terraform.tfvars and re-apply)",
+    "4. Use 'terraform destroy' immediately if tests complete early to avoid unnecessary charges",
+    "5. For long-running tests, use smaller instance types (t3.medium = ~$0.04/hour)",
+    "6. Monitor AWS console for any left-over instances (TTL failures are rare but possible)",
+    "7. See: test/TTL_AND_AUTO_TERMINATION.md for detailed TTL configuration"
+  ]
+}
+
+output "scenario_cost_matrix" {
+  description = "Cost breakdown by test scenario (for reference)"
+  value = {
+    fresh_deployment    = "$0.21 (45 min, baseline validation)"
+    eol_detection       = "$0.32 (60 min, blog post testing)"
+    documentation_test  = "$0.42-0.84 (60-120 min, docs validation)"
+    thehive_integration = "$0.53 (90 min, SOAR integration)"
+    dashboard_access    = "$0.21 (45 min, UI testing)"
+    agent_enrollment    = "$0.21 (45 min, protocol testing)"
+    upgrade_4_to_5      = "$0.44 (90 min, migration testing)"
+  }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DEPLOYMENT INFORMATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+output "wazuh_version" {
+  description = "Deployed Wazuh version"
+  value       = var.wazuh_version
+}
+
+output "test_scenario" {
+  description = "Active test scenario"
+  value       = var.test_scenario
+}
+
+output "infrastructure_summary" {
+  description = "Summary of deployed infrastructure"
+  value = {
+    wazuh_server = {
+      instance_type  = var.wazuh_server_instance_type
+      ami            = "Ubuntu 22.04 LTS"
+      volume_size    = "${var.wazuh_server_volume_size}GB"
+      services       = ["wazuh-manager", "wazuh-indexer", "wazuh-dashboard"]
+      public_access  = "Dashboard (HTTPS 443), API (55000), SSH (22)"
+    }
+    wazuh_agent = {
+      instance_type   = var.agent_instance_type
+      ami             = "Ubuntu 24.04 LTS"
+      volume_size     = "${var.agent_volume_size}GB"
+      services        = ["wazuh-agent", "theHive (optional)"]
+      public_access   = "TheHive (9000), SSH (22)"
+      internal_access = "Manager communication (1514, 1515)"
+    }
+    networking = {
+      vpc         = "Default VPC"
+      security    = "SSH restricted, agent/manager comms VPC-only"
+      encryption  = "EBS volumes encrypted with AWS KMS"
+    }
+  }
+}
+
+output "next_steps" {
+  description = "Recommended next steps after deployment"
+  value = [
+    "1. Retrieve credentials: ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_server.public_dns}",
+    "                         sudo tar -xOf /root/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt",
+    "",
+    "2. Access Wazuh Dashboard: ${aws_instance.wazuh_server.public_dns}",
+    "",
+    "3. Verify agent enrolled: On server: sudo /var/ossec/bin/agent_control -l",
+    "",
+    "4. Check deployment logs: ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_server.public_dns} 'tail -f /var/log/wazuh-install.log'",
+    "",
+    "5. Run test scenario: See test/TEST_SCENARIOS_GUIDE.md for scenario-specific procedures",
+    "",
+    "6. Extend TTL if needed: Edit terraform.tfvars and run 'terraform apply'",
+    "",
+    "7. Cleanup when done: terraform destroy"
+  ]
+}
+
+output "documentation_references" {
+  description = "Links to relevant documentation"
+  value = {
+    test_scenarios         = "test/TEST_SCENARIOS_GUIDE.md - Overview of all test scenarios"
+    deployment_runbooks    = "test/deployments/{version}/RUNBOOK.md - Version-specific procedures"
+    upgrade_testing        = "test/UPGRADE_TEST_TEMPLATE.md - 4.14.6 → 5.0.0 upgrade testing"
+    documentation_testing  = "test/DOCUMENTATION_TEST_TEMPLATE.md - Wazuh docs validation"
+    ttl_configuration      = "test/TTL_AND_AUTO_TERMINATION.md - TTL enforcement details"
+    version_comparison     = "terraform/versions/v5_0_0/COMPARISON.md - 4.14.6 vs 5.0.0"
+    root_readme            = "README.md - Project overview and version support matrix"
+  }
 }

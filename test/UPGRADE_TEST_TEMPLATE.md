@@ -1,0 +1,388 @@
+# Upgrade Testing Template: 4.14.6 → 5.0.0
+
+**Purpose**: Test the migration path from Wazuh 4.14.6 to 5.0.0. Verify service continuity, data preservation, and backward compatibility.
+
+**When to use**:
+- Planning production upgrades
+- Testing upgrade procedures before deploying
+- Validating agent re-enrollment after upgrade
+- Verifying backup/restore workflows
+- Testing rollback procedures
+
+---
+
+## Test Infrastructure
+
+### Deployment
+
+Deploy a 4.14.6 instance, upgrade to 5.0.0, then verify:
+
+```bash
+cd terraform
+
+# Phase 1: Deploy 4.14.6 baseline
+terraform apply \
+  -var="wazuh_major_version=4" \
+  -var="test_scenario=upgrade_4_to_5"
+
+# Save outputs
+terraform output > /tmp/upgrade-baseline.txt
+SERVER_DNS=$(terraform output -raw wazuh_server_public_dns)
+SSH_KEY="wazuh-test-key.pem"
+```
+
+### Test Duration
+
+| Phase | Duration | Notes |
+|-------|----------|-------|
+| Deploy 4.14.6 | 45 min | Initial baseline |
+| Capture state | 10 min | Document pre-upgrade state |
+| Upgrade process | 30 min | In-place upgrade |
+| Verify services | 10 min | All services operational |
+| Test re-enrollment | 15 min | Agent re-enrollment |
+| Total | ~110 min | ~$0.38 cost |
+
+---
+
+## Phase 1: Baseline (4.14.6)
+
+### Step 1.1: Document Pre-Upgrade State
+
+SSH to server and capture baseline:
+
+```bash
+ssh -i $SSH_KEY ubuntu@$SERVER_DNS
+
+# Capture version
+echo "=== Current Version ===" > /tmp/upgrade-baseline.txt
+sudo /var/ossec/bin/wazuh-control info >> /tmp/upgrade-baseline.txt
+
+# Capture services
+echo "" >> /tmp/upgrade-baseline.txt
+echo "=== Services ===" >> /tmp/upgrade-baseline.txt
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl is-active $s >> /tmp/upgrade-baseline.txt
+done
+
+# Capture agents
+echo "" >> /tmp/upgrade-baseline.txt
+echo "=== Enrolled Agents ===" >> /tmp/upgrade-baseline.txt
+sudo /var/ossec/bin/agent_control -l >> /tmp/upgrade-baseline.txt
+
+# Capture config
+echo "" >> /tmp/upgrade-baseline.txt
+echo "=== Manager Config (first 50 lines) ===" >> /tmp/upgrade-baseline.txt
+sudo head -50 /var/ossec/etc/ossec.conf >> /tmp/upgrade-baseline.txt
+
+# Capture Indexer network config
+echo "" >> /tmp/upgrade-baseline.txt
+echo "=== Indexer Network Config ===" >> /tmp/upgrade-baseline.txt
+sudo grep "network.host" /etc/wazuh-indexer/opensearch.yml >> /tmp/upgrade-baseline.txt
+
+# Copy to local
+cat /tmp/upgrade-baseline.txt
+```
+
+### Step 1.2: Create Test Data
+
+Enroll an agent to create baseline data:
+
+```bash
+# Get pre-auth key (or enrollment key)
+AGENT_KEY=$(sudo /var/ossec/bin/agent-auth -m $SERVER_IP -P 514)
+
+# Note: Store this for post-upgrade verification
+echo "Pre-upgrade agent enrolled with key: $AGENT_KEY"
+```
+
+---
+
+## Phase 2: Upgrade Procedure
+
+### Step 2.1: Backup Current Installation
+
+**CRITICAL**: Always backup before upgrading.
+
+```bash
+ssh -i $SSH_KEY ubuntu@$SERVER_DNS
+
+# Create backup
+sudo tar -czf /root/wazuh-4.14.6-backup.tar.gz \
+  /var/ossec \
+  /etc/wazuh-* \
+  /root/wazuh-install-files
+
+# Verify backup size
+sudo ls -lh /root/wazuh-4.14.6-backup.tar.gz
+
+# Note: Backup takes ~2-5 minutes depending on data size
+```
+
+### Step 2.2: Download Upgrade Script
+
+Wazuh provides version-specific upgrade paths. Get the upgrade script:
+
+```bash
+# For 5.0.0 upgrade
+ssh -i $SSH_KEY ubuntu@$SERVER_DNS
+
+# Download upgrade script from Wazuh
+UPGRADE_URL="https://packages.wazuh.com/5.0/upgrade.sh"
+curl -sO "$UPGRADE_URL"
+chmod +x upgrade.sh
+
+# Verify HTTP 200 (R2 rule)
+curl -s -o /dev/null -w '%{http_code}' "$UPGRADE_URL"
+# Expected: 200
+```
+
+### Step 2.3: Execute Upgrade
+
+**R1 RULE**: Never trust status messages - verify with commands.
+
+```bash
+# Review upgrade script before running
+less upgrade.sh
+
+# Run upgrade (with confirmation)
+sudo bash ./upgrade.sh
+
+# Monitor progress
+tail -f /var/log/wazuh-upgrade.log
+
+# Expected output:
+# - Stopping services
+# - Updating packages
+# - Migrating configuration
+# - Restarting services
+# - Upgrade complete
+```
+
+**Typical upgrade time**: 15-30 minutes
+
+### Step 2.4: Verify Services Post-Upgrade
+
+```bash
+echo "=== Checking Services After Upgrade ===" > /tmp/upgrade-verify.txt
+
+# Check each service (R1: actual verification)
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  STATUS=$(sudo systemctl is-active $s 2>&1)
+  if [ "$STATUS" = "active" ]; then
+    echo "✓ $s is ACTIVE" >> /tmp/upgrade-verify.txt
+  else
+    echo "✗ $s FAILED: $STATUS" >> /tmp/upgrade-verify.txt
+    sudo systemctl status $s >> /tmp/upgrade-verify.txt 2>&1
+  fi
+done
+
+# Check version
+echo "" >> /tmp/upgrade-verify.txt
+echo "=== New Version ===" >> /tmp/upgrade-verify.txt
+sudo /var/ossec/bin/wazuh-control info >> /tmp/upgrade-verify.txt
+
+cat /tmp/upgrade-verify.txt
+```
+
+---
+
+## Phase 3: Post-Upgrade Verification
+
+### Step 3.1: Service Health Check
+
+```bash
+# Verify all services running
+ssh -i $SSH_KEY ubuntu@$SERVER_DNS
+
+# Verify services with actual commands (R1 rule)
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl is-active $s
+done
+# Expected: active (×3)
+
+# Check Indexer connectivity
+sudo curl -k -u 'admin:PASSWORD' \
+  https://localhost:9200/_cluster/health \
+  2>/dev/null | jq .
+
+# Check Dashboard
+curl -k -o /dev/null -w 'HTTP %{http_code}\n' https://localhost
+# Expected: 302 (redirect to login) or 200 (success)
+```
+
+### Step 3.2: Agent Re-enrollment
+
+After upgrade, agents must re-enroll:
+
+```bash
+# On agent machine
+sudo /var/ossec/bin/agent-control -r
+
+# On server, check agent appears
+sudo /var/ossec/bin/agent_control -l
+# Expected: Agent ID appears in list
+```
+
+### Step 3.3: Data Preservation Check
+
+Verify data survived upgrade:
+
+```bash
+# Check if indexed data still accessible
+# Example: Query for last 100 alerts
+curl -k -u 'wazuh-wui:PASSWORD' \
+  -X GET 'https://localhost:55000/api/alerts' \
+  2>/dev/null | jq '.data | length'
+
+# Check alert counts pre/post upgrade
+# Compare with baseline from Phase 1
+```
+
+---
+
+## Phase 4: Rollback Procedure (If Needed)
+
+**IF UPGRADE FAILS**: Follow this rollback procedure.
+
+### Step 4.1: Stop Services
+
+```bash
+ssh -i $SSH_KEY ubuntu@$SERVER_DNS
+
+# Stop all Wazuh services
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl stop $s
+done
+
+# Verify stopped
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl is-active $s
+done
+# Expected: inactive (×3)
+```
+
+### Step 4.2: Restore from Backup
+
+```bash
+# Restore backup
+sudo tar -xzf /root/wazuh-4.14.6-backup.tar.gz -C /
+
+# Verify restoration
+ls -la /var/ossec/bin/ | head -5
+ls -la /etc/wazuh-* | head -5
+```
+
+### Step 4.3: Restart Services
+
+```bash
+# Restart services
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl start $s
+done
+
+# Wait for services to stabilize
+sleep 10
+
+# Verify services active
+for s in wazuh-manager wazuh-indexer wazuh-dashboard; do
+  sudo systemctl is-active $s
+done
+# Expected: active (×3)
+
+# Verify version reverted
+sudo /var/ossec/bin/wazuh-control info
+# Expected: Wazuh 4.14.6
+```
+
+---
+
+## Test Results
+
+### Pre-Upgrade Snapshot
+
+```
+[Captured during Phase 1]
+- Version: 4.14.6
+- Services: manager, indexer, dashboard
+- Agents enrolled: N
+- Alerts indexed: M
+```
+
+### Post-Upgrade Snapshot
+
+```
+[Captured during Phase 3]
+- Version: 5.0.0
+- Services: manager, indexer, dashboard
+- Agents re-enrolled: N
+- Alerts accessible: M
+```
+
+### Test Checklist
+
+- [ ] 4.14.6 baseline deployed successfully
+- [ ] Pre-upgrade state documented
+- [ ] Backup created successfully
+- [ ] Upgrade script downloaded (HTTP 200)
+- [ ] Upgrade process completed without errors
+- [ ] All services active after upgrade
+- [ ] Version shows 5.0.0
+- [ ] Agents re-enrolled successfully
+- [ ] Dashboard accessible post-upgrade
+- [ ] API responding post-upgrade
+- [ ] Agent data preserved
+- [ ] Rollback procedure tested (optional)
+
+### Issues Encountered
+
+| Issue | Severity | Resolution | Verified |
+|-------|----------|-----------|----------|
+| [Issue name] | Critical/Important/Minor | [How fixed] | [ ] |
+
+### Recommendations
+
+- [ ] Upgrade safe for production
+- [ ] Documentation needs update
+- [ ] Agent re-enrollment procedure needs clarification
+- [ ] Backup/restore procedure works
+- [ ] Rollback procedure works
+
+---
+
+## Comparison: What Changed in 5.0.0
+
+See [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/COMPARISON.md) for detailed pre/post analysis.
+
+**Quick reference**:
+- Installation method: Same (quickstart installer)
+- Services: Same (manager, indexer, dashboard)
+- Ports: Same (55000 for API, 9200 for Indexer)
+- Credentials: Format unchanged, still in tar file
+- Agent enrollment: Expected same (verify during testing)
+- API endpoints: TBD (needs verification)
+
+---
+
+## Cost Tracking
+
+| Phase | Resource | Duration | Cost |
+|-------|----------|----------|------|
+| Deploy 4.14.6 | t3.xlarge | 45 min | ~$0.21 |
+| Upgrade | t3.xlarge | 30 min | ~$0.14 |
+| Verification | t3.xlarge | 20 min | ~$0.09 |
+| **Total** | | ~110 min | ~$0.44 |
+
+---
+
+## Related Documentation
+
+- [TEST_SCENARIOS_GUIDE.md](TEST_SCENARIOS_GUIDE.md) - Scenario overview
+- [DOCUMENTATION_TEST_TEMPLATE.md](DOCUMENTATION_TEST_TEMPLATE.md) - Doc validation
+- [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/COMPARISON.md) - Version comparison
+- [test/deployments/wazuh_5_0_0/RUNBOOK.md](deployments/wazuh_5_0_0/RUNBOOK.md) - 5.0.0 deployment details
+
+---
+
+**Template Version**: Phase 4  
+**Last Updated**: 2026-07-29  
+**Status**: Ready for testing phase
