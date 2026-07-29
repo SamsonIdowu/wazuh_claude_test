@@ -7,7 +7,7 @@ On-demand infrastructure for testing Wazuh 4.14.6 and 5.0.0 with clean baseline 
 ## 📚 Quick Navigation
 
 - **Agents starting a test**: Read `agent/AGENT_HANDOFF.md`
-- **How the system works**: See `ARCHITECTURE_CORRECTION.md`
+- **How the system works**: See "What This Is" below and `agent/TESTING_WORKFLOW.md`
 - **Test documentation**: See `test/TEST_SCENARIOS_GUIDE.md`
 - **Infrastructure code**: See `terraform/`
 
@@ -67,9 +67,13 @@ terraform apply  # Deploys with generated test code
 ```bash
 terraform destroy           # Removes AWS resources
 rm -rf test/terraform/      # Deletes test-specific code
-rm -rf results/             # Deletes test outputs
-# Repository now identical to baseline
+rm -rf results/*            # Deletes test outputs (keep the .gitkeep)
+rm -rf test/requirements/*  # Deletes reconstructed configs/policies from this test
+# Verify against AWS directly, not just the exit code — terraform state can
+# be empty while an orphaned resource still exists if something failed silently
 ```
+Sweep for any other test-specific script you created outside these
+directories too — `git status --short` afterward should show nothing new.
 
 ---
 
@@ -100,8 +104,7 @@ wazuh_test/
 │   │   └── upgrade_4_to_5/RUNBOOK.md (upgrade procedures)
 │   └── terraform/ (EMPTY - agents create during tests)
 │
-├── results/ (test outputs - gitignored)
-├── ARCHITECTURE_CORRECTION.md (system design)
+├── results/ (test outputs - gitignored, wiped at cleanup)
 └── README.md (this file)
 ```
 
@@ -196,11 +199,19 @@ After each test:
 cd terraform
 terraform destroy
 
-# Step 2: Delete test-specific code
+# Step 2: Delete test-specific code (sweep for stragglers outside this dir too)
 rm -rf test/terraform/
 
-# Step 3: Delete test outputs
-rm -rf results/
+# Step 3: Delete test outputs and reconstructed requirements
+rm -rf results/*            # keep the .gitkeep
+rm -rf test/requirements/*
+
+# Step 4: Verify against AWS directly, not just the exit code — terraform
+# state can be empty while an orphaned resource still exists if something
+# failed silently
+aws ec2 describe-instances --profile wazuh \
+  --filters "Name=tag:Name,Values=wazuh-server,wazuh-agent" \
+  --query "Reservations[].Instances[].State.Name"
 
 # Result: Repository identical to baseline
 ```
@@ -265,7 +276,7 @@ terraform refresh
 ## 📖 Documentation
 
 ### For Infrastructure Setup
-- `ARCHITECTURE_CORRECTION.md` — System design and cleanup procedures
+- This file's "What This Is" and "Cleanup" sections — system design and cleanup procedures
 - `terraform/variables.tf` — All configuration options with descriptions
 
 ### For Testing

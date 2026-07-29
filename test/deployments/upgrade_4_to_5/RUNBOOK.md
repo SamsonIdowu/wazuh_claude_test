@@ -41,9 +41,7 @@ cd terraform
 terraform validate
 
 # Check terraform.tfvars or set inline
-terraform apply -var-file="terraform.tfvars" \
-  -var="wazuh_major_version=4" \
-  -var="test_scenario=upgrade_4_to_5"
+terraform apply -var-file="terraform.tfvars" -var="wazuh_version=4.14.6"
 ```
 
 ### What Gets Deployed
@@ -416,7 +414,6 @@ Next steps: [List any]
 
 - [UPGRADE_TEST_TEMPLATE.md](../UPGRADE_TEST_TEMPLATE.md) - Step-by-step testing procedure
 - [TEST_SCENARIOS_GUIDE.md](../TEST_SCENARIOS_GUIDE.md) - Scenario overview
-- [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/COMPARISON.md) - 4.14.6 vs 5.0.0 comparison
 - [test/deployments/wazuh_5_0_0/RUNBOOK.md](../wazuh_5_0_0/RUNBOOK.md) - 5.0.0 deployment details
 
 ---

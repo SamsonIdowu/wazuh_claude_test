@@ -1,10 +1,12 @@
 # Wazuh 5.0.0 Deployment Runbook
 
-**Status:** 📋 PHASE 2 READY — Infrastructure code created, awaiting live testing
+**Status:** Findings below are based on research; update after actual deployment.
 
 This runbook documents the procedure and expected differences for deploying Wazuh 5.0.0 on AWS.
 
-> **IMPORTANT**: Terraform code (`terraform/versions/v5_0_0/`) created in Phase 2. Deploy with `terraform apply -var="wazuh_major_version=5"` to test. Findings below are based on research; will be updated after actual deployment.
+> **IMPORTANT**: There is no separate `terraform/versions/` module for 5.0.0 —
+> the baseline `terraform/` deploys any version via the `wazuh_version`
+> variable. Deploy with `terraform apply -var="wazuh_version=5.0.0"` to test.
 
 ---
 
@@ -109,7 +111,11 @@ Expected (based on service continuity):
 - Pre-auth enrollment still supported
 
 **Action during testing**:
-1. Deploy agent on separate instance with `wazuh_major_version=4` (for now)
+1. The baseline deploys server + agent at the *same* `wazuh_version` — there's
+   no per-instance version variable. To test a 4.x agent against a 5.0 server,
+   deploy the baseline at 5.0.0, then manually reinstall the agent package at
+   4.14.6 over SSH (mirroring `terraform/wazuh-agent-init.sh`'s install steps
+   at the older version) rather than expecting a Terraform variable to do it.
 2. Verify agent enrolls to 5.0 server
 3. Check for compatibility issues
 
@@ -190,7 +196,7 @@ cat /tmp/wazuh-5.0-verify.txt
 
 ---
 
-## How to Deploy 5.0.0 (Phase 2 Testing)
+## How to Deploy 5.0.0
 
 ### Prerequisites
 - AWS credentials configured
@@ -201,13 +207,11 @@ cat /tmp/wazuh-5.0-verify.txt
 ```bash
 cd terraform
 
-# Option 1: Use variables
-terraform apply \
-  -var="wazuh_major_version=5" \
-  -var="test_scenario=fresh_deployment"
+# Option 1: Use a variable flag
+terraform apply -var="wazuh_version=5.0.0"
 
 # Option 2: Update terraform.tfvars
-# Add: wazuh_major_version = 5
+# Add: wazuh_version = "5.0.0"
 terraform apply
 ```
 

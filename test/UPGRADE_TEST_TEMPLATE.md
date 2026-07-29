@@ -20,10 +20,10 @@ Deploy a 4.14.6 instance, upgrade to 5.0.0, then verify:
 ```bash
 cd terraform
 
-# Phase 1: Deploy 4.14.6 baseline
-terraform apply \
-  -var="wazuh_major_version=4" \
-  -var="test_scenario=upgrade_4_to_5"
+# Phase 1: Deploy 4.14.6 baseline (the upgrade itself is run manually over
+# SSH using Wazuh's own upgrade tooling — there is no upgrade-specific
+# Terraform variable; this deploys the same baseline as any other test)
+terraform apply -var="wazuh_version=4.14.6"
 
 # Save outputs
 terraform output > /tmp/upgrade-baseline.txt
@@ -333,6 +333,87 @@ sudo /var/ossec/bin/wazuh-control info
 - [ ] Agent data preserved
 - [ ] Rollback procedure tested (optional)
 
+### Test Results Output Formats
+
+After completing the upgrade test, generate comprehensive results in **PDF** and **HTML** formats:
+
+#### PDF Report (`upgrade-test-report.pdf`)
+```
+├── Executive Summary
+│   ├── Overall result: PASS / PARTIAL / FAIL
+│   ├── Upgrade duration: [time]
+│   ├── Services status: [count] active/inactive
+│   ├── Data preservation: [verification result]
+│   ├── Agent re-enrollment: [count] succeeded/failed
+│   └── Technical issues: [count] critical/important/minor
+│
+├── Technical Review
+│   ├── Phase 1 Results (4.14.6 baseline)
+│   │   ├── Deployment status (✅ / ❌)
+│   │   ├── Pre-upgrade state snapshot
+│   │   └── Services verification
+│   │
+│   ├── Phase 2 Results (Upgrade process)
+│   │   ├── Backup created (✅ / ❌)
+│   │   ├── Upgrade script validity (HTTP code)
+│   │   ├── Upgrade process duration
+│   │   └── Any errors encountered
+│   │
+│   ├── Phase 3 Results (Post-upgrade verification)
+│   │   ├── Service status (✅ all active / ❌ [list failed])
+│   │   ├── Version verification (5.0.0 confirmed)
+│   │   ├── Agent re-enrollment success rate
+│   │   ├── Data accessibility check
+│   │   └── Dashboard/API functional test
+│   │
+│   └── Phase 4 Results (If rollback tested)
+│       ├── Services stopped (✅ / ❌)
+│       ├── Backup restore (✅ / ❌)
+│       └── Rollback verification
+│
+├── Writing Quality Review (if testing documentation)
+│   ├── Upgrade procedure clarity
+│   ├── Prerequisite completeness
+│   ├── Command formatting consistency
+│   └── Expected outcome clarity
+│
+└── Appendix
+    ├── Pre/post state comparison
+    ├── Full command output logs
+    └── Timestamp of test execution
+```
+
+#### HTML Report (`upgrade-test-report.html`)
+```html
+<interactive-dashboard>
+  <status-indicators>
+    <overall-result emoji="✅">PASS</overall-result>
+    <services-status>manager: active, indexer: active, dashboard: active</services-status>
+    <data-preservation percentage="100%">Verified</data-preservation>
+    <agent-reenrollment count="1">Success</agent-reenrollment>
+  </status-indicators>
+  
+  <timeline>
+    <phase name="4.14.6 Baseline" duration="45 min" status="✅" />
+    <phase name="Upgrade Process" duration="30 min" status="✅" />
+    <phase name="Post-Upgrade Verification" duration="20 min" status="✅" />
+    <phase name="Data Preservation Check" duration="10 min" status="✅" />
+  </timeline>
+  
+  <detailed-results collapsible="true">
+    <section id="pre-upgrade-state">
+      <h3>Pre-Upgrade State Snapshot</h3>
+      <code-block language="text">Version: 4.14.6, Services: [list], Agents: [count]</code-block>
+    </section>
+    
+    <section id="post-upgrade-state">
+      <h3>Post-Upgrade State Snapshot</h3>
+      <code-block language="text">Version: 5.0.0, Services: [list], Agents: [count]</code-block>
+    </section>
+  </detailed-results>
+</interactive-dashboard>
+```
+
 ### Issues Encountered
 
 | Issue | Severity | Resolution | Verified |
@@ -351,9 +432,9 @@ sudo /var/ossec/bin/wazuh-control info
 
 ## Comparison: What Changed in 5.0.0
 
-See [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/COMPARISON.md) for detailed pre/post analysis.
-
-**Quick reference**:
+**Quick reference** (capture the detailed pre/post analysis in this test's
+`results/` report rather than a permanent comparison doc — there's no
+`terraform/versions/` split in the current baseline to hang one off):
 - Installation method: Same (quickstart installer)
 - Services: Same (manager, indexer, dashboard)
 - Ports: Same (55000 for API, 9200 for Indexer)
@@ -378,7 +459,6 @@ See [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/CO
 
 - [TEST_SCENARIOS_GUIDE.md](TEST_SCENARIOS_GUIDE.md) - Scenario overview
 - [DOCUMENTATION_TEST_TEMPLATE.md](DOCUMENTATION_TEST_TEMPLATE.md) - Doc validation
-- [terraform/versions/v5_0_0/COMPARISON.md](../../terraform/versions/v5_0_0/COMPARISON.md) - Version comparison
 - [test/deployments/wazuh_5_0_0/RUNBOOK.md](deployments/wazuh_5_0_0/RUNBOOK.md) - 5.0.0 deployment details
 
 ---

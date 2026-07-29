@@ -7,13 +7,12 @@ This directory contains information and guidance for AI agents running tests in 
 ## Files
 
 ### AGENT_HANDOFF.md
-**Complete onboarding guide for agents**
+**Essentials-and-troubleshooting supplement** — read the root `README.md`'s
+"What This Is" section and `agent/TESTING_WORKFLOW.md` first; this file
+doesn't repeat their content.
 
 - 5-minute essentials (what to deploy, costs, timing)
-- Key concepts (baseline, generated test infrastructure, cleanup)
-- Step-by-step workflows with exact commands
-- Common tasks (deploy, extend TTL, SSH, cleanup)
-- Gap analysis (what's complete vs incomplete)
+- Verification rules summary (R1-R4)
 - Troubleshooting guide
 - FAQ
 
@@ -46,11 +45,14 @@ This directory contains information and guidance for AI agents running tests in 
 - `test/` — Test documentation and procedures
 - All `.md` files — Guidance for testing
 
-**Ephemeral (created during test, deleted after):**
+**Ephemeral, deleted at cleanup — every test, no exceptions:**
 - `test/terraform/` — Test-specific infrastructure code (agent generates)
-- `results/` — Test outputs
+- `results/` — the test report and any scripts written as findings
+- `test/requirements/` — reconstructed configs/policies the test needed
+- Any other test-specific script created outside those directories — sweep for these too
 
-**Result after cleanup:** Repository identical to baseline, no test artifacts.
+**Result after cleanup:** AWS resources gone, all test-specific artifacts
+gone, repository identical to its starting state.
 
 ---
 
@@ -76,8 +78,7 @@ This directory contains information and guidance for AI agents running tests in 
 │   ├── deployments/ (runbooks)
 │   └── terraform/ (EMPTY - created during test)
 │
-├── ARCHITECTURE_CORRECTION.md (how system works)
-└── README.md (project overview)
+└── README.md (project overview — see "What This Is" for how the system works)
 ```
 
 ---
@@ -132,9 +133,11 @@ terraform apply
 ```bash
 terraform destroy
 rm -rf test/terraform/
-rm -rf results/
-# Repository is now baseline
+rm -rf results/*            # keep the .gitkeep
+rm -rf test/requirements/*
 ```
+Sweep for any other test-specific script created outside these directories
+too — `git status --short` afterward should show nothing new.
 
 ---
 
@@ -153,7 +156,7 @@ rm -rf results/
 ## Questions?
 
 - **How do I deploy?** → See AGENT_HANDOFF.md
-- **What's the architecture?** → Read ARCHITECTURE_CORRECTION.md
+- **What's the architecture?** → Read the root README.md's "What This Is" section
 - **What are test scenarios?** → See test/TEST_SCENARIOS_GUIDE.md
 - **How do I test documentation?** → See test/DOCUMENTATION_TEST_TEMPLATE.md
 - **How do I test upgrades?** → See test/UPGRADE_TEST_TEMPLATE.md

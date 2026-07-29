@@ -224,8 +224,8 @@ All tests follow this pattern:
    
 7. CLEANUP
    terraform destroy
-   rm -rf test/terraform/
-   rm -rf results/
+   rm -rf test/terraform/ results/* test/requirements/*
+   (sweep for stray test scripts elsewhere too)
    
 8. VERIFY
    Repository is identical to baseline
@@ -249,7 +249,7 @@ All assume default 4-hour TTL. Extend TTL in terraform.tfvars if needed.
 
 ---
 
-## Verification Rules (R1 & R2)
+## Verification Rules (R1-R4)
 
 **R1: Never trust status, always verify with command**
 - ❌ Don't: "Service is running" (assumed)
@@ -259,6 +259,22 @@ All assume default 4-hour TTL. Extend TTL in terraform.tfvars if needed.
 **R2: Verify URLs before piping to shell**
 - ❌ Don't: `curl -s URL | bash`
 - ✅ DO: Check HTTP 200 first, then run
+
+**R3: Document writing quality alongside functional correctness**
+- Check for spelling errors, grammar, punctuation issues
+- Verify code formatting (backticks, code blocks, language tags)
+- Confirm consistent terminology throughout
+- Flag unclear instructions, missing prerequisites, or confusing steps
+- Report writing issues separately from functional issues
+
+**R4: Review document structure and automate what you can**
+- Check heading hierarchy matches actual content — flag runs of near-empty
+  subheadings (a list masquerading as sections) and wrong nesting
+- For any 3+ step manual procedure touching files/config, ask whether it
+  could be one script — and if so, write the script, don't just suggest it
+- A script replacing a "go check the UI" step should verify its own result
+  with a command (ties back to R1)
+- Report structural/automation findings separately from writing issues
 
 All test templates enforce these rules.
 
@@ -274,6 +290,53 @@ All test templates enforce these rules.
 
 ---
 
+## Test Result Output Formats
+
+All tests must produce results in **PDF and HTML** formats containing:
+
+### PDF Report Format
+- **Executive Summary** — Overall pass/fail, key metrics
+- **Technical Review** — Step-by-step verification with actual vs expected outcomes
+- **Code Review** — Validation of all code examples/commands
+- **Writing Quality Review** — Spelling, grammar, formatting, clarity
+- **Issues Summary** — Severity-ranked findings with evidence
+- **Appendix** — Full command outputs, screenshots, timestamps
+
+### HTML Report Format
+- **Interactive Dashboard** — Status indicators, charts, collapsible sections
+- **Timeline View** — Sequential steps with duration and status
+- **Detailed Findings** — Each finding with location, example, and recommendation
+- **Comparison Tables** — Pre/post states, version differences
+- **Code Highlighting** — All code examples with syntax highlighting
+- **Navigation** — Table of contents with jump links
+
+### What Must Be Included in Both Formats
+
+**Technical Elements**:
+- ✅ Which procedures succeeded vs failed
+- ✅ Actual command output vs expected
+- ✅ Verification commands and results
+- ✅ Service status checks (with `systemctl is-active`, not assumptions)
+- ✅ URL validations (HTTP status codes)
+- ✅ Configuration file validations
+- ✅ Data integrity checks
+
+**Writing Quality Elements**:
+- ✅ Spelling and grammar issues (with exact location)
+- ✅ Code formatting problems (with examples)
+- ✅ Consistency issues (with all instances listed)
+- ✅ Clarity issues (with explanation of confusion)
+- ✅ Missing prerequisites or expected outcomes
+- ✅ Recommendations for improvement
+
+**Severity Classification**:
+- 🔴 **Critical** — Blocks understanding or breaks functionality
+- 🟡 **Important** — Confusing or causes rework
+- 🟢 **Minor** — Polish/style issues
+
+---
+
 **Last Updated**: 2026-07-29  
 **System**: Baseline + generated test code  
+**Output**: PDF + HTML reports with technical and writing reviews  
 **Status**: All scenarios ready for agents
