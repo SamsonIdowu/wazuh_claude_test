@@ -354,39 +354,15 @@ resource "aws_instance" "wazuh_server" {
 
   instance_initiated_shutdown_behavior = local.shutdown_behavior
 
-  # Official Wazuh quickstart all-in-one install:
-  # https://documentation.wazuh.com/current/quickstart.html
-  user_data = base64encode(<<-EOF
-${local.ttl_prologue}
-set -euxo pipefail
-exec > >(tee -a /var/log/wazuh-install.log) 2>&1
-
-WAZUH_BRANCH="$(echo "${var.wazuh_version}" | cut -d. -f1,2)"
-cd /root
-curl -sO "https://packages.wazuh.com/$${WAZUH_BRANCH}/wazuh-install.sh"
-bash ./wazuh-install.sh -a -i
-
-# The quickstart installer binds the indexer to network.host: 127.0.0.1, so
-# it is unreachable externally even with the security group open on 9200 -
-# confirmed twice now, not a one-off. Rebind and confirm it comes back active
-# before declaring the deployment ready.
-sed -i 's|^network.host: .*|network.host: "0.0.0.0"|' /etc/wazuh-indexer/opensearch.yml
-systemctl restart wazuh-indexer
-for i in $(seq 1 12); do
-  systemctl is-active --quiet wazuh-indexer && break
-  sleep 5
-done
-
-# Persist generated admin credentials for retrieval
-tar -xf wazuh-install-files.tar -C /root 2>/dev/null || true
-echo "WAZUH_INSTALL_COMPLETE=$(date -Is)" > /root/WAZUH_READY
-EOF
-  )
+  user_data = base64encode(templatefile("${path.module}/wazuh-server-init.sh", {
+    ttl_prologue           = local.ttl_prologue
+    wazuh_version          = var.wazuh_version
+    resource_ttl_minutes   = var.resource_ttl_minutes
+  }))
 
   tags = {
     Name               = "wazuh-server"
-    Purpose            = "Wazuh ${var.wazuh_version} Testing"
-    Scenario           = var.test_scenario
+    Purpose            = "Wazuh Server"
     TTL_Minutes        = var.resource_ttl_minutes
     AutoTermination    = var.enable_auto_termination
     CreatedAt          = timestamp()
@@ -395,20 +371,7 @@ EOF
   depends_on = [aws_security_group.wazuh_server]
 }
 
-# Combined Wazuh Agent + TheHive EC2 Instance
-#
-# Per the infrastructure guide, TheHive runs on the SAME Ubuntu 24 endpoint as
-# the Wazuh agent, not on a dedicated instance. user_data runs three chunks in
-# sequence in a single boot script:
-#   1. TTL prologue (schedules self-termination first, per REAL TTL ENFORCEMENT above)
-#   2. wazuh-agent-init.sh (templatefile - needs wazuh_server_ip/wazuh_version
-#      interpolated by Terraform)
-#   3. thehive-init.sh (file() - contains literal shell ${VAR} that must survive
-#      Terraform untouched; see that file's own header for why upstream's
-#      StrangeBee compose is used instead of a hand-written one)
-# A bare "#!/bin/bash" appearing after the first line of a script is just a
-# comment to bash, so concatenating three self-contained scripts this way is
-# safe - each one's `set -e`/`exec > >(tee ...)` applies from that point on.
+# Wazuh Agent EC2 Instance
 resource "aws_instance" "wazuh_agent" {
   ami                    = data.aws_ami.ubuntu_agent.id
   instance_type          = var.agent_instance_type
@@ -438,18 +401,15 @@ resource "aws_instance" "wazuh_agent" {
   monitoring                           = true
   instance_initiated_shutdown_behavior = local.shutdown_behavior
 
-  user_data = base64encode(join("\n", [
-    local.ttl_prologue,
-    templatefile("${path.module}/wazuh-agent-init.sh", {
-      wazuh_server_ip = aws_instance.wazuh_server.private_ip
-      wazuh_version   = var.wazuh_version
-    }),
-    file("${path.module}/thehive-init.sh")
-  ]))
+  user_data = base64encode(templatefile("${path.module}/wazuh-agent-init.sh", {
+    ttl_prologue    = local.ttl_prologue
+    wazuh_server_ip = aws_instance.wazuh_server.private_ip
+    wazuh_version   = var.wazuh_version
+  }))
 
   tags = {
     Name            = "wazuh-agent"
-    Purpose         = "Wazuh Agent + TheHive Endpoint"
+    Purpose         = "Wazuh Agent"
     TTL_Minutes     = var.resource_ttl_minutes
     AutoTermination = var.enable_auto_termination
     CreatedAt       = timestamp()
@@ -552,27 +512,13 @@ output "ttl_configuration" {
 output "cost_optimization_tips" {
   description = "Tips to optimize testing costs"
   value = [
-    "1. Use test_scenario variable to deploy only needed resources (each scenario has cost estimate)",
-    "2. Default TTL of 60 minutes (~$0.21) covers most test scenarios",
-    "3. Extend TTL only if testing takes longer (edit terraform.tfvars and re-apply)",
-    "4. Use 'terraform destroy' immediately if tests complete early to avoid unnecessary charges",
-    "5. For long-running tests, use smaller instance types (t3.medium = ~$0.04/hour)",
-    "6. Monitor AWS console for any left-over instances (TTL failures are rare but possible)",
-    "7. See: test/TTL_AND_AUTO_TERMINATION.md for detailed TTL configuration"
+    "1. Default TTL of 240 minutes (~$0.84) - adjust via terraform.tfvars",
+    "2. Extend TTL if testing takes longer (edit resource_ttl_minutes and re-apply)",
+    "3. Use 'terraform destroy' immediately if done testing to avoid unnecessary charges",
+    "4. For cost-sensitive tests, use smaller instance types (t3.medium = ~$0.04/hour)",
+    "5. Monitor AWS console for any left-over instances (TTL failures are rare but possible)",
+    "6. See: test/TTL_AND_AUTO_TERMINATION.md for detailed TTL configuration"
   ]
-}
-
-output "scenario_cost_matrix" {
-  description = "Cost breakdown by test scenario (for reference)"
-  value = {
-    fresh_deployment    = "$0.21 (45 min, baseline validation)"
-    eol_detection       = "$0.32 (60 min, blog post testing)"
-    documentation_test  = "$0.42-0.84 (60-120 min, docs validation)"
-    thehive_integration = "$0.53 (90 min, SOAR integration)"
-    dashboard_access    = "$0.21 (45 min, UI testing)"
-    agent_enrollment    = "$0.21 (45 min, protocol testing)"
-    upgrade_4_to_5      = "$0.44 (90 min, migration testing)"
-  }
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -582,11 +528,6 @@ output "scenario_cost_matrix" {
 output "wazuh_version" {
   description = "Deployed Wazuh version"
   value       = var.wazuh_version
-}
-
-output "test_scenario" {
-  description = "Active test scenario"
-  value       = var.test_scenario
 }
 
 output "infrastructure_summary" {
@@ -603,8 +544,8 @@ output "infrastructure_summary" {
       instance_type   = var.agent_instance_type
       ami             = "Ubuntu 24.04 LTS"
       volume_size     = "${var.agent_volume_size}GB"
-      services        = ["wazuh-agent", "theHive (optional)"]
-      public_access   = "TheHive (9000), SSH (22)"
+      services        = ["wazuh-agent"]
+      public_access   = "SSH (22)"
       internal_access = "Manager communication (1514, 1515)"
     }
     networking = {
@@ -621,29 +562,24 @@ output "next_steps" {
     "1. Retrieve credentials: ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_server.public_dns}",
     "                         sudo tar -xOf /root/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt",
     "",
-    "2. Access Wazuh Dashboard: ${aws_instance.wazuh_server.public_dns}",
+    "2. Access Wazuh Dashboard: https://${aws_instance.wazuh_server.public_dns}",
     "",
     "3. Verify agent enrolled: On server: sudo /var/ossec/bin/agent_control -l",
     "",
     "4. Check deployment logs: ssh -i wazuh-test-key.pem ubuntu@${aws_instance.wazuh_server.public_dns} 'tail -f /var/log/wazuh-install.log'",
     "",
-    "5. Run test scenario: See test/TEST_SCENARIOS_GUIDE.md for scenario-specific procedures",
+    "5. Extend TTL if needed: Edit terraform.tfvars resource_ttl_minutes and run 'terraform apply'",
     "",
-    "6. Extend TTL if needed: Edit terraform.tfvars and run 'terraform apply'",
-    "",
-    "7. Cleanup when done: terraform destroy"
+    "6. Cleanup when done: terraform destroy"
   ]
 }
 
 output "documentation_references" {
   description = "Links to relevant documentation"
   value = {
-    test_scenarios         = "test/TEST_SCENARIOS_GUIDE.md - Overview of all test scenarios"
-    deployment_runbooks    = "test/deployments/{version}/RUNBOOK.md - Version-specific procedures"
-    upgrade_testing        = "test/UPGRADE_TEST_TEMPLATE.md - 4.14.6 → 5.0.0 upgrade testing"
-    documentation_testing  = "test/DOCUMENTATION_TEST_TEMPLATE.md - Wazuh docs validation"
-    ttl_configuration      = "test/TTL_AND_AUTO_TERMINATION.md - TTL enforcement details"
-    version_comparison     = "terraform/versions/v5_0_0/COMPARISON.md - 4.14.6 vs 5.0.0"
-    root_readme            = "README.md - Project overview and version support matrix"
+    main_readme     = "README.md - Project overview"
+    architecture    = "ARCHITECTURE_CORRECTION.md - Repository structure and cleanup procedures"
+    agent_handoff   = "AGENT_HANDOFF.md - Guide for agents running tests"
+    ttl_config      = "test/TTL_AND_AUTO_TERMINATION.md - TTL enforcement details"
   }
 }

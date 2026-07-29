@@ -41,15 +41,15 @@ variable "wazuh_server_volume_size" {
 }
 
 variable "agent_instance_type" {
-  description = "Instance type for the Ubuntu endpoint (Wazuh agent + TheHive, colocated). t3.xlarge = 4 vCPU / 16GB RAM per the infrastructure guide."
+  description = "Instance type for Wazuh agent"
   type        = string
-  default     = "t3.xlarge"
+  default     = "t3.medium"
 }
 
 variable "agent_volume_size" {
-  description = "Root volume size for the agent+TheHive endpoint (GB). 50GB per the infrastructure guide."
+  description = "Root volume size for Wazuh agent (GB)"
   type        = number
-  default     = 50
+  default     = 20
 }
 
 variable "wazuh_version" {
@@ -73,34 +73,4 @@ variable "enable_auto_termination" {
   description = "Enable automatic resource termination after TTL expires"
   type        = bool
   default     = true
-}
-
-variable "wazuh_major_version" {
-  description = "Major Wazuh version to deploy (4 or 5)"
-  type        = number
-  default     = 4
-
-  validation {
-    condition     = contains([4, 5], var.wazuh_major_version)
-    error_message = "Wazuh major version must be 4 or 5."
-  }
-}
-
-variable "test_scenario" {
-  description = "Test scenario to run (controls which resources are deployed)"
-  type        = string
-  default     = "fresh_deployment"
-
-  validation {
-    condition = contains([
-      "fresh_deployment",
-      "eol_detection",
-      "documentation_test",
-      "thehive_integration",
-      "upgrade_4_to_5",
-      "agent_enrollment",
-      "dashboard_access"
-    ], var.test_scenario)
-    error_message = "Invalid test scenario. Must be one of: fresh_deployment, eol_detection, documentation_test, thehive_integration, upgrade_4_to_5, agent_enrollment, dashboard_access."
-  }
 }
