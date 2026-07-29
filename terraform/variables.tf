@@ -74,3 +74,33 @@ variable "enable_auto_termination" {
   type        = bool
   default     = true
 }
+
+variable "wazuh_major_version" {
+  description = "Major Wazuh version to deploy (4 or 5)"
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = contains([4, 5], var.wazuh_major_version)
+    error_message = "Wazuh major version must be 4 or 5."
+  }
+}
+
+variable "test_scenario" {
+  description = "Test scenario to run (controls which resources are deployed)"
+  type        = string
+  default     = "fresh_deployment"
+
+  validation {
+    condition = contains([
+      "fresh_deployment",
+      "eol_detection",
+      "documentation_test",
+      "thehive_integration",
+      "upgrade_4_to_5",
+      "agent_enrollment",
+      "dashboard_access"
+    ], var.test_scenario)
+    error_message = "Invalid test scenario. Must be one of: fresh_deployment, eol_detection, documentation_test, thehive_integration, upgrade_4_to_5, agent_enrollment, dashboard_access."
+  }
+}

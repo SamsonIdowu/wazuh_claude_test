@@ -18,6 +18,22 @@ Comprehensive infrastructure for testing Wazuh 4.14.6 EOL detection capabilities
 
 ---
 
+## 📋 Version Support Matrix
+
+| Version | Status | Fresh Deploy | EOL Detection | TheHive | Upgrade Path | Notes |
+|---------|--------|--------------|---------------|---------|--------------|-------|
+| **4.14.6** | ✅ Production | ✅ Done | ✅ Done | ✅ Done | — | Blog post tested, full runbook available |
+| **5.0.0** | 🔄 In Progress | 📋 Phase 2 | 📋 Phase 3 | 📋 Phase 3 | 📋 Phase 4 | Research in progress, stub runbook created |
+| **5.1.0** | 🔴 Planned | 🔴 Future | 🔴 Future | 🔴 Future | 🔴 Future | Available after 5.0.0 validation |
+
+**Status Legend:**
+- ✅ Done — Tested and verified working
+- 🔄 In Progress — Active development/research
+- 📋 Planned — Designed, waiting for prerequisites
+- 🔴 Future — Not yet started, depends on earlier phases
+
+---
+
 ## 🚀 Quick Start
 
 ### Option 1: Automated Testing (Recommended)
