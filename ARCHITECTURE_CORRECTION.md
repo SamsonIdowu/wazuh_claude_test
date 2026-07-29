@@ -99,41 +99,48 @@ This should work for ANY agent, ANYTIME, no special setup.
 
 ---
 
-### Test-Specific Deployment (Test Creates, Cleanup Destroys)
+### Test-Specific Deployment (Agent Generates, Cleanup Destroys)
 
-Example: TheHive integration test
+Example: Testing Wazuh documentation or blog post
 
 ```bash
-# Agent (before test) creates test-specific code:
-cat > test/terraform/thehive-security-group.tf << 'EOF'
-# TheHive security group configuration
-# Created during: thehive_integration test
-# Deleted during: cleanup
-resource "aws_security_group" "thehive" {
+# 1. Agent reads the documentation/blog post to be tested
+# 2. Agent analyzes and extracts requirements:
+#    - What services are needed?
+#    - What configuration is required?
+#    - What scenario matches?
+
+# 3. Agent GENERATES test-specific terraform code based on requirements:
+cat > test/terraform/generated-test-config.tf << 'EOF'
+# Generated from: https://docs.wazuh.com/...
+# Test objective: Validate EOL detection blog post
+# Required infrastructure:
+#   - Wazuh server 4.14.6
+#   - Wazuh agent
+#   - Additional rules for EOL detection
+#   - Security group rule for external API calls
+
+resource "aws_security_group_rule" "external_api" {
+  # Generated based on: "EOL detection requires external API access"
+  ...
+}
+
+resource "local_file" "eol_detector_config" {
+  # Generated based on: "Deploy eol_detector.py to /var/ossec/integrations"
   ...
 }
 EOF
 
-# Agent extends variables:
-cat > test/terraform/additional-variables.tf << 'EOF'
-variable "deploy_thehive" {
-  default = true
-}
-EOF
-
-# Agent creates init script:
-cp test/templates/thehive-init.sh test/terraform/
-
-# Agent deploys:
+# 4. Agent deploys with generated code:
 cd terraform
 terraform init
-terraform apply -var="wazuh_version=4.14.6"
+terraform apply
   # Sees test/terraform/*.tf and includes them
-  # Deploys server + agent + thehive
+  # Deploys server + agent + generated test-specific config
 
-# Agent runs test...
+# 5. Agent runs test according to documentation...
 
-# After test succeeds:
+# 6. After test completes:
 terraform destroy
 rm -rf test/terraform/
 # Repository is back to baseline
@@ -167,47 +174,23 @@ terraform/
 └── terraform.tfvars.example
 ```
 
-### `test/` (Documentation + Templates)
+### `test/` (Documentation + Test Procedures)
 ```
 test/
 ├── README.md (test guidance)
 ├── TEST_SCENARIOS_GUIDE.md (7 scenarios)
-├── DOCUMENTATION_TEST_TEMPLATE.md
-├── UPGRADE_TEST_TEMPLATE.md
-├── templates/ ← Templates for test-specific code
-│   ├── thehive-security-group.tf.template
-│   ├── thehive-init.sh.template
-│   ├── upgrade-modules.tf.template
-│   └── etc.
+├── DOCUMENTATION_TEST_TEMPLATE.md (framework for docs/blog posts)
+├── UPGRADE_TEST_TEMPLATE.md (framework for upgrades)
 ├── deployments/ (procedures + runbooks)
 │   ├── wazuh_4_14_6/RUNBOOK.md
 │   ├── wazuh_5_0_0/RUNBOOK.md
 │   └── upgrade_4_to_5/RUNBOOK.md
-└── terraform/ ← CREATED DURING TEST, DELETED AT CLEANUP
-    ├── (empty, except during active test)
-    └── (agent populates with test-specific code)
+└── terraform/ ← GENERATED DURING TEST, DELETED AT CLEANUP
+    ├── (empty when not testing)
+    └── (agent GENERATES test-specific code from documentation)
 ```
 
-### `test/templates/` (New - Code Templates for Tests)
-
-Rather than permanently storing test-specific code, store TEMPLATES:
-
-```
-test/templates/
-├── thehive-security-group.tf
-│   # Describes TheHive security group needed
-│   # Agent copies to test/terraform/ when running thehive_integration test
-├── thehive-init.sh
-│   # TheHive installation script
-│   # Agent copies to test/terraform/ when needed
-├── upgrade-v5-modules.tf
-│   # Wazuh 5.0.0 module for upgrade testing
-│   # Agent copies during upgrade_4_to_5 test
-└── README.md
-    # Documents what each template is for
-    # Which test uses it
-    # What it deploys
-```
+**Key difference**: No static templates. Agent READS documentation and GENERATES appropriate test infrastructure.
 
 ---
 
@@ -243,40 +226,41 @@ Another agent can now clone and deploy without inheriting test artifacts.
 
 ---
 
-## What Each Test Type Creates
+## What Each Test Generates
 
-### `fresh_deployment` Scenario
-- **Creates**: Nothing (uses baseline)
+### Baseline Test (No Documentation)
+- **Generates**: Nothing (uses baseline terraform)
 - **Deploys**: Wazuh server + agent
 - **Cost**: $0.21
 - **Cleanup**: terraform destroy
 
-### `eol_detection` Scenario
-- **Creates**: Nothing (uses baseline)
-- **Deploys**: Wazuh server + agent
-- **Cost**: $0.32
-- **Cleanup**: terraform destroy
-
-### `documentation_test` Scenario
-- **Creates**: Nothing (uses baseline)
-- **Deploys**: Wazuh server + agent
-- **Cost**: $0.42-0.84
-- **Cleanup**: terraform destroy
-
-### `thehive_integration` Scenario
-- **Creates**: 
-  - test/terraform/thehive-security-group.tf
-  - test/terraform/thehive-init.sh
-  - test/terraform/additional-variables.tf
-- **Deploys**: Wazuh server + agent + TheHive
-- **Cost**: $0.53
+### Testing a Blog Post (e.g., EOL Detection)
+- **Input**: Blog post/documentation URL
+- **Agent analyzes**: What infrastructure, config, rules are needed?
+- **Generates**:
+  - test/terraform/test-config.tf (security groups, any extra resources)
+  - test/terraform/test-init.sh (custom configuration/rules)
+  - test/terraform/test-variables.tf (scenario-specific variables)
+- **Deploys**: Wazuh server + agent + blog post requirements
+- **Cost**: Depends on generated infrastructure ($0.21-0.53)
 - **Cleanup**: terraform destroy + rm -rf test/terraform/
 
-### `upgrade_4_to_5` Scenario
-- **Creates**:
-  - test/terraform/upgrade-support.tf (extra checks/logging)
-  - test/terraform/upgrade-variables.tf (upgrade-specific vars)
-- **Deploys**: Wazuh 4.14.6 server + agent (baseline for upgrade)
+### Testing Wazuh Documentation
+- **Input**: Documentation URL (e.g., docs.wazuh.com/installation-guide/)
+- **Agent analyzes**: What version? What features? What procedures?
+- **Generates**:
+  - test/terraform/test-config.tf (documentation requirements)
+  - test/terraform/verification-rules.tf (checks to validate docs)
+- **Deploys**: Wazuh server + agent configured per documentation
+- **Cost**: $0.42-0.84 (comprehensive testing)
+- **Cleanup**: terraform destroy + rm -rf test/terraform/
+
+### Testing Upgrade Path
+- **Input**: "Test 4.14.6 → 5.0.0 upgrade"
+- **Agent generates**:
+  - test/terraform/upgrade-baseline.tf (4.14.6 baseline)
+  - test/terraform/upgrade-checks.tf (before/after verification)
+- **Deploys**: 4.14.6 baseline (prepared for upgrade)
 - **Cost**: $0.44
 - **Cleanup**: terraform destroy + rm -rf test/terraform/
 
@@ -292,12 +276,13 @@ Another agent can now clone and deploy without inheriting test artifacts.
 - [ ] Remove TheHive from `terraform/outputs.tf`
 - [ ] Simplify `terraform/main.tf` to baseline only
 
-### Phase 2: Create Test Templates
-- [ ] Create `test/templates/` directory
-- [ ] Move TheHive code → `test/templates/thehive-security-group.tf`
-- [ ] Move TheHive init → `test/templates/thehive-init.sh`
-- [ ] Create templates for upgrade scenario
-- [ ] Document what each template does
+### Phase 2: Create Test Requirements Directory
+- [ ] Create `test/requirements/` directory for test-specific code snippets
+  - Not Terraform (Terraform is generated per test)
+  - Shell scripts, configuration files, Python scripts that tests might need
+  - Example: `eol_detector.py`, `custom-rules.xml`, etc.
+  - Agent pulls these when generating test infrastructure
+- [ ] Document what's available and when to use it
 
 ### Phase 3: Create Cleanup Script
 - [ ] Update `cleanup.ps1` to:
@@ -368,34 +353,125 @@ terraform apply -var="wazuh_version=4.14.6"
 # Works immediately, no test-specific code
 ```
 
-### Agent Running TheHive Test
+### Agent Testing a Blog Post or Documentation
 
 ```bash
-# 1. Read test/TEST_SCENARIOS_GUIDE.md → pick thehive_integration
-# 2. Read test/templates/README.md → understand what's needed
-# 3. Copy templates to test/terraform/
-cp test/templates/thehive-security-group.tf test/terraform/
-cp test/templates/thehive-init.sh test/terraform/
-# 4. Deploy
+# 1. User provides: "Test this blog post: https://example.com/eol-detection"
+# 2. Agent reads the documentation/blog post
+# 3. Agent analyzes: "This requires EOL detector, external API access, custom rules"
+# 4. Agent GENERATES test-specific Terraform code:
+cat > test/terraform/generated-test.tf << 'EOF'
+# Generated from analysis of: https://example.com/eol-detection
+# Generated requirements:
+#   - Wazuh 4.14.6 server
+#   - Agent for data collection
+#   - Security group rule for external API (EOL detection service)
+#   - Installation of eol_detector.py script
+
+resource "aws_security_group_rule" "eol_api_access" {
+  # Generated: "Blog requires external API calls to endoflife.date"
+  ...
+}
+
+resource "local_file" "eol_detector_script" {
+  # Generated: "Deploy custom Python script for EOL detection"
+  filename = "/var/ossec/integrations/eol_detector.py"
+  content  = file("${path.module}/../test-requirements/eol_detector.py")
+}
+EOF
+
+# 5. Agent deploys:
 cd terraform
 terraform apply
-# 5. Test...
-# 6. Cleanup
+
+# 6. Agent tests according to the blog post procedures
+# 7. Agent documents findings in test-verdict.md
+
+# 8. Agent cleans up:
 terraform destroy
 rm -rf test/terraform/
-# 7. Repository is baseline again
+# Repository is back to baseline
 ```
 
-### Agent Running Upgrade Test
+### Agent Testing Wazuh 5.0.0 Documentation
 
 ```bash
-# 1. Read test/deployments/upgrade_4_to_5/RUNBOOK.md
-# 2. Copy upgrade templates
-cp test/templates/upgrade-*.tf test/terraform/
-# 3. Deploy (starts on 4.14.6 baseline)
+# 1. User provides: "Validate Wazuh 5.0.0 installation docs"
+# 2. Agent reads: https://docs.wazuh.com/5.0/installation-guide/
+# 3. Agent analyzes: "Requires Ubuntu 22.04, t3.xlarge, specific security ports"
+# 4. Agent GENERATES test infrastructure:
+cat > test/terraform/generated-documentation-test.tf << 'EOF'
+# Generated from: https://docs.wazuh.com/5.0/installation-guide/
+# Test: Validate documented installation procedure works on 5.0.0
+
+resource "aws_instance" "wazuh_5_0_server" {
+  # Generated: "Docs require Ubuntu 22.04 LTS"
+  ami = data.aws_ami.ubuntu_22_04.id
+  
+  user_data = base64encode(<<-SCRIPT
+    # Generated: "Follow exact installation steps from documentation"
+    curl -sO https://packages.wazuh.com/5.0/wazuh-install.sh
+    bash ./wazuh-install.sh -a -i
+  SCRIPT
+  )
+}
+
+resource "local_file" "verification_procedures" {
+  # Generated: "Document verification steps from docs"
+  filename = "/tmp/doc-verification.sh"
+  content  = <<-SCRIPT
+    # Generated verification rules from documentation
+    echo "Checking: Services running"
+    systemctl is-active wazuh-manager wazuh-indexer wazuh-dashboard
+  SCRIPT
+}
+EOF
+
+# 5. Agent deploys with generated requirements:
 terraform apply
-# 4. Follow upgrade procedure from RUNBOOK.md
-# 5. Cleanup
+
+# 6. Agent executes documentation procedures and verifies they work
+
+# 7. Agent cleans up:
+terraform destroy
+rm -rf test/terraform/
+```
+
+### Agent Testing Upgrade Path
+
+```bash
+# 1. User provides: "Test 4.14.6 → 5.0.0 upgrade"
+# 2. Agent reads: test/deployments/upgrade_4_to_5/RUNBOOK.md and UPGRADE_TEST_TEMPLATE.md
+# 3. Agent analyzes: "Need 4.14.6 baseline, then upgrade to 5.0.0"
+# 4. Agent GENERATES upgrade test infrastructure:
+cat > test/terraform/generated-upgrade-test.tf << 'EOF'
+# Generated for: 4.14.6 → 5.0.0 upgrade testing
+# Phase 1: Deploy 4.14.6 baseline
+# Phase 2: Run upgrade script
+# Phase 3: Verify 5.0.0
+
+resource "local_file" "backup_procedure" {
+  # Generated: "Before upgrade, backup current installation"
+  filename = "/tmp/backup.sh"
+  content  = "tar -czf /root/wazuh-4.14.6-backup.tar.gz /var/ossec /etc/wazuh-*"
+}
+
+resource "local_file" "upgrade_verification" {
+  # Generated: "After upgrade, verify services and data"
+  filename = "/tmp/verify-upgrade.sh"
+  content  = <<-SCRIPT
+    sudo /var/ossec/bin/wazuh-control info
+    # Expected: Manager 5.0.0
+  SCRIPT
+}
+EOF
+
+# 5. Agent deploys 4.14.6 baseline:
+terraform apply
+
+# 6. Agent follows UPGRADE_TEST_TEMPLATE.md procedures
+# 7. Agent documents upgrade success/issues
+# 8. Agent cleans up:
 terraform destroy
 rm -rf test/terraform/
 ```
@@ -407,11 +483,12 @@ rm -rf test/terraform/
 | Aspect | Before | After |
 |--------|--------|-------|
 | **Permanent code** | Mixed baseline + test | Baseline only |
-| **Test code location** | terraform/ (permanent) | test/templates/ + test/terraform/ (ephemeral) |
+| **Test code location** | terraform/ (permanent) | test/terraform/ (GENERATED per test, ephemeral) |
+| **Test creation** | Copy static templates | ANALYZE documentation, GENERATE requirements |
 | **After cleanup** | Different from initial | Identical to initial |
 | **First-time deploy** | Must ignore test code | Works directly |
-| **Adding new test** | Modify permanent files | Add template, no repo change |
-| **Repository state** | Carries test artifacts | Always clean |
+| **Adding new test** | Modify permanent files | Agent reads docs, generates infrastructure |
+| **Repository state** | Carries test artifacts | Always clean baseline |
 
 ---
 
