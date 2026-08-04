@@ -75,6 +75,7 @@ gone, repository identical to its starting state.
 │   ├── TEST_SCENARIOS_GUIDE.md
 │   ├── DOCUMENTATION_TEST_TEMPLATE.md
 │   ├── UPGRADE_TEST_TEMPLATE.md
+│   ├── Language and formatting style guide for technical writing _ Wazuh.md (R3 authority)
 │   ├── deployments/ (runbooks)
 │   └── terraform/ (EMPTY - created during test)
 │
@@ -160,6 +161,9 @@ too — `git status --short` afterward should show nothing new.
 - **What are test scenarios?** → See test/TEST_SCENARIOS_GUIDE.md
 - **How do I test documentation?** → See test/DOCUMENTATION_TEST_TEMPLATE.md
 - **How do I test upgrades?** → See test/UPGRADE_TEST_TEMPLATE.md
+- **How do I review writing quality (R3)?** → Check the document against
+  `test/Language and formatting style guide for technical writing _ Wazuh.md`
+  — the authoritative Wazuh style guide, not a generic grammar checklist
 
 ---
 

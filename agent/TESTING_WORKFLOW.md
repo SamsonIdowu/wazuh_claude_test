@@ -375,13 +375,28 @@ Test this Wazuh 5.0 authentication integration:
 
 ## Writing Quality Checks
 
-When testing documentation or blog posts, agents should also verify **writing quality** alongside functional correctness:
+When testing documentation or blog posts, agents must review **writing
+quality** against **`test/Language and formatting style guide for technical
+writing _ Wazuh.md`** — this is the authoritative Wazuh writing style guide,
+not a generic grammar checklist. Open it and check the document against its
+actual rules (voice and tone, grammar A-Z reference, text formatting,
+section-element conventions). Where this file and the style guide disagree,
+the style guide wins — update this file instead of trusting stale guidance
+here.
 
-### Grammar & Punctuation
+The categories below are a quick-scan reminder of what to look for, not a
+substitute for reading the guide:
+
+### Grammar & Punctuation (see the guide's "Language and grammar" A-Z reference)
 - Spelling errors (typos, misspelled commands/filenames)
-- Sentence structure (run-ons, fragments, dangling modifiers)
-- Punctuation consistency (periods, commas, colons)
-- Capitalization (titles, proper nouns, acronyms)
+- Sentence structure (run-ons, fragments, dangling modifiers) — max ~26 words/sentence, one idea per sentence
+- Oxford/serial comma in lists of three or more
+- Sentence-style capitalization for headings and titles (not Title Case, except marketing copy)
+- Banned words: *could/should/would/may*, *etc./i.e./e.g.*, *please* (in instructions)
+- *can* vs. *might* vs. *may* — *can* for user actions, *might* for uncertain outcomes, never *may*
+- No gender-specific pronouns (*he/she*) — use *you*, *they*, or *the user*
+- No possessive of product/company names ("the Wazuh agent", not "Wazuh's agent")
+- Active voice preferred; passive is fine for prerequisites, system actions, or avoiding blame in troubleshooting
 
 ### Code Formatting & Style
 - Code blocks properly marked (```language tags)
@@ -403,6 +418,10 @@ When testing documentation or blog posts, agents should also verify **writing qu
 - Assumptions stated explicitly
 - Warnings and notes clearly marked
 - Section references accurate and working
+
+### Wazuh-specific terminology (from the style guide's "Writing Wazuh rules" section)
+- Custom Wazuh rule IDs fall in the 100000–120000 range
+- Deprecated terms flagged wherever used, especially in rule/decoder descriptions: *OpenSCAP, OpenSearch, Kibana, ElasticSearch*
 
 ### Document Issues Found
 Agents should report writing issues separately from functional issues:
@@ -533,29 +552,43 @@ Deploy to the server and verify:
 
 ## Writing Standards for Documentation Testing
 
-When validating documentation quality, agents should enforce these standards:
+When validating documentation quality, agents enforce **`test/Language and
+formatting style guide for technical writing _ Wazuh.md`** — read it, don't
+just skim the summary below. It covers voice and tone, an A-Z grammar
+reference, text-formatting conventions (bold/italic/code font rules, heading
+tags, list formatting), how to write each type of section element (titles,
+short descriptions, prerequisites, tasks and steps), and Wazuh-specific rule
+conventions.
 
-### Grammar & Language
-- **Spelling**: No misspellings in commands, file paths, or prose
-- **Tense**: Consistent tense (usually imperative for procedures: "Run", "Configure", "Verify")
-- **Voice**: Active voice preferred in procedures ("Run the command" vs "The command should be run")
-- **Subject consistency**: Use consistent terms (e.g., "manager" or "server" but not both for same component)
+### A few rules from the guide worth calling out, because they're easy to get wrong
+- **Sentence case, not Title Case**, for section titles, table titles, and list items (Title Case is reserved for marketing content)
+- **Banned words**: *could/should/would/may* → use *must* or *can*, or rewrite; *etc./i.e./e.g.* → rewrite with *including*, *such as*, or *like*
+- ***can* vs. *might* vs. *may***: *can* for what the user can do, *might* for uncertain outcomes, never *may*
+- **Oxford/serial comma** before the conjunction in a list of three or more
+- **No gender-specific pronouns** — use *you*, *the user(s)*, or *they*
+- **No possessive** of product/company/feature names ("the Wazuh agent," never "Wazuh's agent")
+- **Contractions** (don't, can't, isn't) are fine, used sparingly — never contract the company/product name itself
+- **click** for buttons/tabs/hotlinks; **select** for menus/lists/checkboxes — don't use "check"/"uncheck"
+- **Task titles start with an imperative verb**; don't start with *Understanding*, *About*, or *Working with*
+- Deprecated terminology to flag on sight, especially in rule/decoder descriptions: *OpenSCAP, OpenSearch, Kibana, ElasticSearch*
+- Custom Wazuh rule IDs fall in the **100000–120000** range
 
 ### Code Examples & Command Formatting
 - **Code blocks**: Use triple backticks with language identifier (```bash, ```json, ```yaml)
 - **Inline code**: Use backticks for file paths, commands, variables (e.g., `wazuh-manager`)
 - **Command output**: Clearly distinguish from instructions using code blocks
 - **Continuation lines**: Use backslash continuation (\\) with proper formatting
-- **Variables**: Indicate replaceable parts with `<angle_brackets>` or `${VARIABLE}`
+- **Variables**: Indicate replaceable parts with `<ANGLE_BRACKETS>` (the guide specifies uppercase, underscore-separated) or `${VARIABLE}`
 - **Prompts**: Distinguish shell prompts (# for root, $ for user)
 
 ### Structure & Formatting
 - **Headings**: Use proper hierarchy (# > ## > ### > ####)
-- **Lists**: 
+- **Lists**:
   - Numbered (1. 2. 3.) for sequential steps
   - Bullets (- or •) for non-sequential items
   - Consistent indentation for nested items
-- **Emphasis**: Bold for UI elements, italics for emphasis, code for technical terms
+  - Complete-sentence list items end with a period; sentence-fragment items don't — don't mix the two within one list
+- **Emphasis**: Bold for UI elements, italics for defined terms/parameter names, code for technical terms
 - **Links**: Format as [text](url) with working URLs
 - **Tables**: Use | | | format with proper alignment
 
@@ -564,14 +597,13 @@ When validating documentation quality, agents should enforce these standards:
 - **Warnings**: Use clear markers like `**Warning:**` or `**Note:**`
 - **Expected outcomes**: State what happens on success
 - **Troubleshooting**: Document common errors and solutions
-- **Prerequisites first**: List what must be installed/configured before steps
 
 ### Style Consistency Checklist
 - [ ] Terminology consistent throughout (no "dashboard" vs "UI" switching)
 - [ ] All file paths use forward slashes or proper OS separator
 - [ ] All commands properly formatted in code blocks with language tag
 - [ ] All external links work (return HTTP 200 or 302)
-- [ ] All headings follow title case or sentence case consistently
+- [ ] All headings and titles use sentence case, not Title Case
 - [ ] All numbered procedures start at 1, not 0
 - [ ] All environment variables use ALL_CAPS convention
 - [ ] All file/folder names use proper case (lowercase with hyphens vs underscores)
@@ -579,6 +611,9 @@ When validating documentation quality, agents should enforce these standards:
 - [ ] Consistent bullet point style (- or • but not mixed)
 - [ ] All tables have proper column alignment
 - [ ] All code examples are syntactically valid
+- [ ] No banned words (*could/should/would/may*, *etc./i.e./e.g.*) in prose
+- [ ] No deprecated terminology (*OpenSCAP, OpenSearch, Kibana, ElasticSearch*)
+- [ ] Any custom Wazuh rule IDs fall in the 100000–120000 range
 
 ### Issues to Flag
 **Critical** (must fix before publication):
@@ -608,13 +643,14 @@ When validating documentation quality, agents should enforce these standards:
 - **Agent will generate what's needed** — you don't specify infrastructure, just the test
 - **Agent verifies with actual commands** (R1 rule — no assumptions)
 - **Agent verifies URLs return HTTP 200/302** (R2 rule — before piping to shell)
-- **Agent checks writing quality** (R3 rule — documentation is usable only if it's readable)
+- **Agent checks writing quality against the Wazuh style guide** (R3 rule — `test/Language and formatting style guide for technical writing _ Wazuh.md` is the authority; documentation is usable only if it's readable)
 - **Agent reviews structure and automates what it can** (R4 rule — heading hierarchy matches content, and manual multi-step procedures get a proof-of-concept script, not just a suggestion)
 - **Agent documents discrepancies** if actual != expected
 - **Repository stays clean** — all test code deleted after cleanup
 
 ---
 
-**Last Updated**: 2026-07-29  
+**Last Updated**: 2026-08-04  
 **Status**: Ready for agent use  
-**Includes**: Writing quality standards (R3 rule)
+**Includes**: Writing quality standards (R3 rule) — authoritative source is
+`test/Language and formatting style guide for technical writing _ Wazuh.md`

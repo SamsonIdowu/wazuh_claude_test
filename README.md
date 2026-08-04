@@ -9,6 +9,7 @@ On-demand infrastructure for testing Wazuh 4.14.6 and 5.0.0 with clean baseline 
 - **Agents starting a test**: Read `agent/AGENT_HANDOFF.md`
 - **How the system works**: See "What This Is" below and `agent/TESTING_WORKFLOW.md`
 - **Test documentation**: See `test/TEST_SCENARIOS_GUIDE.md`
+- **Writing quality review (R3)**: Always check documents against `test/Language and formatting style guide for technical writing _ Wazuh.md`
 - **Infrastructure code**: See `terraform/`
 
 ---
@@ -98,6 +99,7 @@ wazuh_test/
 │   ├── DOCUMENTATION_TEST_TEMPLATE.md (test docs framework)
 │   ├── UPGRADE_TEST_TEMPLATE.md (upgrade testing)
 │   ├── TTL_AND_AUTO_TERMINATION.md (cost control)
+│   ├── Language and formatting style guide for technical writing _ Wazuh.md (R3 authority — writing quality review)
 │   ├── deployments/
 │   │   ├── wazuh_4_14_6/RUNBOOK.md (4.14.6 procedures)
 │   │   ├── wazuh_5_0_0/RUNBOOK.md (5.0.0 procedures)
@@ -286,6 +288,7 @@ terraform refresh
 - `test/UPGRADE_TEST_TEMPLATE.md` — Framework for upgrade testing
 - `test/TTL_AND_AUTO_TERMINATION.md` — Cost control details
 - `test/deployments/*/RUNBOOK.md` — Version-specific procedures
+- `test/Language and formatting style guide for technical writing _ Wazuh.md` — Authoritative Wazuh writing style guide; every document review (R3) is checked against this file
 
 ---
 

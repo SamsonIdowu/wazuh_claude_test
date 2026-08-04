@@ -260,10 +260,23 @@ All assume default 4-hour TTL. Extend TTL in terraform.tfvars if needed.
 - ❌ Don't: `curl -s URL | bash`
 - ✅ DO: Check HTTP 200 first, then run
 
-**R3: Document writing quality alongside functional correctness**
-- Check for spelling errors, grammar, punctuation issues
-- Verify code formatting (backticks, code blocks, language tags)
-- Confirm consistent terminology throughout
+**R3: Review writing quality against the Wazuh style guide**
+- Authoritative source: `test/Language and formatting style guide for technical writing _ Wazuh.md`.
+  Check documents against this file directly — it is the standard, not a
+  generic grammar checklist. If the guide and any other doc in this repo
+  disagree on a writing rule, the style guide wins.
+- High-value, mechanical checks worth running every time (non-exhaustive —
+  read the guide for the rest):
+  - Banned words: *could/should/would/may*, *etc./i.e./e.g.*, *please* (in instructions)
+  - *can* vs. *might* vs. *may* — *can* for user actions, *might* for uncertain
+    outcomes, never *may*
+  - Sentence case for headings and titles, not Title Case (except marketing copy)
+  - Oxford/serial comma in lists of three or more
+  - No gender-specific pronouns (*he/she*) — use *you*, *they*, or *the user*
+  - No possessive of product/company names ("the Wazuh agent", not "Wazuh's agent")
+  - Deprecated terminology to flag wherever it appears, especially in rule or
+    decoder descriptions: *OpenSCAP, OpenSearch, Kibana, ElasticSearch*
+  - Custom Wazuh rule IDs fall in the 100000–120000 range
 - Flag unclear instructions, missing prerequisites, or confusing steps
 - Report writing issues separately from functional issues
 
@@ -286,6 +299,7 @@ All test templates enforce these rules.
 - [UPGRADE_TEST_TEMPLATE.md](UPGRADE_TEST_TEMPLATE.md) — Framework for testing upgrades
 - [test/deployments/](deployments/) — Version-specific runbooks
 - [TTL_AND_AUTO_TERMINATION.md](TTL_AND_AUTO_TERMINATION.md) — Cost control details
+- `test/Language and formatting style guide for technical writing _ Wazuh.md` — Authoritative writing style guide (R3)
 - [agent/AGENT_HANDOFF.md](../agent/AGENT_HANDOFF.md) — Agent onboarding
 
 ---
@@ -321,8 +335,10 @@ All tests must produce results in **PDF and HTML** formats containing:
 - ✅ Configuration file validations
 - ✅ Data integrity checks
 
-**Writing Quality Elements**:
+**Writing Quality Elements** (checked against `test/Language and formatting
+style guide for technical writing _ Wazuh.md`, not a generic checklist):
 - ✅ Spelling and grammar issues (with exact location)
+- ✅ Style guide violations (banned words, voice, capitalization, deprecated terms — cite the guide section)
 - ✅ Code formatting problems (with examples)
 - ✅ Consistency issues (with all instances listed)
 - ✅ Clarity issues (with explanation of confusion)

@@ -71,8 +71,10 @@ Full detail in `test/TEST_SCENARIOS_GUIDE.md`; the short version:
 - **R1**: Never report something as working from status text alone — verify
   with a command (`systemctl is-active ...`, `curl`, a database query).
 - **R2**: Verify a URL returns HTTP 200 before piping it to a shell.
-- **R3**: Review writing quality (grammar, formatting, consistency) alongside
-  functional correctness — not as an afterthought.
+- **R3**: Review writing quality against `test/Language and formatting style
+  guide for technical writing _ Wazuh.md` — the authoritative Wazuh style
+  guide, not a generic grammar checklist — alongside functional correctness,
+  not as an afterthought.
 - **R4**: Review document structure (heading hierarchy) and automation
   opportunities (can N manual steps become one script?) — and if a script is
   warranted, write it, don't just suggest it.
@@ -101,7 +103,7 @@ Full detail in `test/TEST_SCENARIOS_GUIDE.md`; the short version:
 ## What TO Do
 
 - Verify with actual commands, always (R1-R2).
-- Review writing quality and document structure, always (R3-R4) — write a script rather than just describing that one's possible.
+- Review writing quality against the Wazuh style guide, and document structure, always (R3-R4) — write a script rather than just describing that one's possible.
 - Check costs before deploying (`terraform output | grep -i cost`).
 - `terraform destroy` when done, then confirm against AWS directly (`aws ec2 describe-instances`), not just the local Terraform state.
 - Document findings clearly, in `results/`.
@@ -128,6 +130,8 @@ Finish (or destroy) one before starting the next.
 **Summary for another agent**: *"Deploy the baseline with `terraform apply
 -var=\"wazuh_version=4.14.6\"` from `terraform/`. Read `agent/TESTING_WORKFLOW.md`
 for how to receive and review whatever you're testing (functional + writing +
-structure/automation). Verify everything with real commands, never trust
-status text. Clean up completely — `terraform destroy`, verify against AWS,
-remove test-specific scripts — when done."*
+structure/automation). Review writing quality against `test/Language and
+formatting style guide for technical writing _ Wazuh.md`, the authoritative
+Wazuh style guide — not a generic checklist. Verify everything with real
+commands, never trust status text. Clean up completely — `terraform destroy`,
+verify against AWS, remove test-specific scripts — when done."*

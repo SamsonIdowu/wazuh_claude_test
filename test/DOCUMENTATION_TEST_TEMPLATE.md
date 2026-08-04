@@ -91,14 +91,24 @@ ssh -i $SSH_KEY ubuntu@$SERVER_DNS
 
 ### Phase 4: Validate Writing Quality
 
-Before executing procedures, review documentation for:
+Before executing procedures, review the documentation against
+**`test/Language and formatting style guide for technical writing _ Wazuh.md`**
+— the authoritative Wazuh style guide. Read it directly rather than relying
+only on the checklist below, which highlights the most mechanical/checkable
+rules from it.
 
-**Grammar & Punctuation**
+**Grammar & Punctuation** (see the guide's A-Z "Language and grammar" reference)
 - [ ] No spelling errors
-- [ ] Consistent punctuation (periods at end of sentences)
-- [ ] Proper capitalization (titles, proper nouns)
-- [ ] Consistent contractions (don't vs do not)
+- [ ] Consistent punctuation (periods at end of sentences); Oxford comma in lists of three or more
+- [ ] Sentence-style capitalization for titles/headings (not Title Case, except marketing copy)
+- [ ] Consistent contractions (don't vs do not) — never contract "Wazuh" itself
 - [ ] No double spaces or extra whitespace
+- [ ] No banned words: *could/should/would/may*, *etc./i.e./e.g.*, *please* (in instructions)
+- [ ] Correct *can* / *might* / *may* usage — *can* for user actions, *might* for uncertain outcomes, never *may*
+- [ ] No gender-specific pronouns (*he/she*) — *you*, *they*, or *the user*
+- [ ] No possessive of product/company names ("the Wazuh agent," not "Wazuh's agent")
+- [ ] No deprecated terminology, especially in rule/decoder descriptions: *OpenSCAP, OpenSearch, Kibana, ElasticSearch*
+- [ ] Any custom Wazuh rule IDs fall in the 100000–120000 range
 
 **Code Formatting & Style**
 - [ ] Code blocks properly formatted (```language)
