@@ -1,4 +1,4 @@
-#!/bin/bash
+${ttl_prologue}
 set -e
 
 echo "Starting Wazuh ${wazuh_version} Agent Installation..."
