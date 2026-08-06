@@ -65,10 +65,26 @@ resource "tls_private_key" "main" {
 }
 
 # Save private key locally
+#
+# file_permission = "0600" is a no-op on Windows: local_file only sets POSIX
+# mode bits, which Windows has none of. The real gate on Windows is the file's
+# ACL, which by default inherits from the parent folder - on this machine that
+# inheritance grants Full Control to SYSTEM, Administrators, AND an unrelated
+# "remote" account. OpenSSH's Windows client refuses to load a key if ANY
+# account other than the owner can read it, so every fresh `terraform apply`
+# produced a key ssh immediately rejected with "Bad permissions" /
+# "UNPROTECTED PRIVATE KEY FILE". The provisioner below strips inherited ACLs
+# and grants read-only access to the current user only, right after the key
+# is written, so this can't recur.
 resource "local_file" "private_key" {
   content         = tls_private_key.main.private_key_pem
   filename        = "${var.ssh_key_output_path}/wazuh-test-key.pem"
   file_permission = "0600"
+
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-Command"]
+    command     = "icacls '${self.filename}' /inheritance:r /grant:r \"$($env:USERNAME):(R)\""
+  }
 }
 
 # AWS key pair
