@@ -1,41 +1,89 @@
 # Wazuh 5.0.0 Deployment Runbook
 
-**Status:** Findings below are based on research; update after actual deployment.
+**Status:** Live-tested 2026-08-17 against a real 5.0.0-beta4 deployment (see
+`test/Results`/memory for the full FIM documentation test). Sections below
+marked ✅ CONFIRMED are from that live test, not research/guesswork.
 
 This runbook documents the procedure and expected differences for deploying Wazuh 5.0.0 on AWS.
 
 > **IMPORTANT**: There is no separate `terraform/versions/` module for 5.0.0 —
 > the baseline `terraform/` deploys any version via the `wazuh_version`
 > variable. Deploy with `terraform apply -var="wazuh_version=5.0.0"` to test.
+> **But read "Preferred Artifact Source" and "1. Installation Procedure"
+> below first** — the baseline's `wazuh-server-init.sh`/`wazuh-agent-init.sh`
+> hardcode `packages.wazuh.com` and 4.x-style flags, which do **not** work
+> for 5.0.0/5.0-beta. Write a test-specific override script instead (see
+> `terraform-override-tf-mechanism` in the project memory).
+
+---
+
+## Preferred Artifact Source
+
+**Always use [`artifact_urls_5.0.0-latest.yaml`](artifact_urls_5.0.0-latest.yaml)
+in this directory as the starting point for any 5.0 package/installer URL.**
+Do not guess a version string (`5.0.0`, `5.0.0-beta4`, etc.) and hand-build a
+`packages.wazuh.com` or `packages-staging.xdrsiem.wazuh.info` URL from it —
+confirmed live on 2026-08-17 that a guessed/hardcoded version string
+(`wazuh-agent=5.0.0-beta4`) fails outright even though the *installer script*
+at a beta4-named path works fine; the actual installable package version in
+the same repo was `5.0.0-1`, matching neither guess. The
+`artifact_urls_5.0.0-latest.yaml` file uses the `-latest` tag (not a frozen
+beta number) under a dated `nightly-backup/<date>/` path, which is the
+convention that actually stays resolvable. If the dates in that file look
+stale by the time you're testing, ask whoever supplied it for a refreshed
+copy rather than falling back to guessed URLs — don't reverse-engineer a new
+URL by pattern-matching the old one, since the pre-release distribution
+paths/flags have already changed at least once (see "1. Installation
+Procedure" below).
 
 ---
 
 ## Overview
 
-Wazuh 5.0.0 uses the same installation approach as 4.14.6 (quickstart installer) with minor URL changes. Core services, credential retrieval, and port configuration appear identical.
+Wazuh 5.0.0/5.0-beta does **not** use the same installation approach as
+4.14.6. ⚠️ Confirmed live: it is **not** `packages.wazuh.com/5.0/wazuh-install.sh -a -i`
+(see below) — it's a different distribution entirely, with its own installer
+and (per "Preferred Artifact Source" above) its own package URLs that must
+be looked up, not guessed from the 4.x pattern.
 
-**Key differences to verify during testing:**
-- API endpoint paths (may have changed)
-- Agent enrollment protocol (may have changed)
-- Indexer localhost binding (confirm if still present)
+**Confirmed during live testing (2026-08-17):**
+- Manager path moved: `/var/wazuh-manager/` (not `/var/ossec/`); binaries
+  renamed `wazuh-manager-*`. Agent paths are unchanged (`/var/ossec/`).
+- `agent_control` no longer exists — use the REST API (`GET /agents` on
+  :55000) to check enrollment.
+- Default dashboard/indexer credentials are the literal `admin`/`admin`
+  (not random); API account is `wazuh-wui`/`wazuh-wui`. No
+  `wazuh-passwords.txt` is generated.
+- Agent enrollment needs `WAZUH_REGISTRATION_PASSWORD` at install time
+  (the manager's `authd.pass`) — now documented on the agent-install pages,
+  and works cleanly with no manual key-copy step when supplied.
 
 ---
 
 ## 1. Installation Procedure
 
-✅ **CONFIRMED** (based on Wazuh release patterns):
+✅ **CONFIRMED live 2026-08-17** (single-node, via the assisted all-in-one installer):
 
 ```bash
-WAZUH_BRANCH=5.0
-curl -sO "https://packages.wazuh.com/${WAZUH_BRANCH}/wazuh-install.sh"
-bash ./wazuh-install.sh -a -i
+wget https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x/installation-assistant/wazuh-install-5.0.0-beta4.sh
+sudo bash ./wazuh-install-5.0.0-beta4.sh -a -id -d pre-release
 ```
 
-**Key points:**
-- URL format `/5.0/` (consistent with `/4.x/` pattern)
-- Installation flags `-a -i` (same as 4.14.6)
-- Estimated time: ~30 minutes (same as 4.14.6)
-- **IMPORTANT**: Always verify URL returns HTTP 200 before piping to bash (silent 403 failures occur otherwise)
+- `-a` = all-in-one (manager+indexer+dashboard on one node); `-id` = auto
+  install missing OS dependencies; `-d pre-release` selects the staging
+  distribution channel. Works on Ubuntu 22.04 in ~9-15 minutes despite the
+  installer's own OS-support check listing only 24.04/26.04.
+- **This installer script path is itself version-pinned to `beta4`** and may
+  already be superseded — check `artifact_urls_5.0.0-latest.yaml`'s
+  `wazuh_installation_assistant` entry for the current URL before assuming
+  the command above still resolves.
+- The **package version actually installed** (`apt list --installed`,
+  `dpkg -l | grep wazuh`) may not match the string in the installer's own
+  filename — confirmed installing as `5.0.0-1` under a `wazuh-install-*beta4*.sh`
+  script. Don't assume the two must match; verify with a command (R1).
+- **IMPORTANT**: Always verify a URL returns HTTP 200 before piping to bash
+  (R2) — this holds doubly for pre-release/staging URLs, which move more
+  often than `packages.wazuh.com`.
 
 ---
 
@@ -52,10 +100,11 @@ Expected (based on 4.14.6 pattern):
 **Action during testing**: Verify `network.host` setting and whether restart is needed.
 
 ### Credentials & Access
-**Status**: ✅ EXPECTED SAME
+**Status**: ✅ CONFIRMED live 2026-08-17 — differs from 4.14.6
 
-- Passwords: Random (not `admin/admin`)
-- Retrieval: `tar -xOf /root/wazuh-install-files.tar wazuh-install-files/wazuh-passwords.txt`
+- Passwords: literal `admin`/`admin` (dashboard + indexer), `wazuh-wui`/`wazuh-wui` (API) —
+  **not** random, unlike 4.14.6. No `wazuh-passwords.txt` is generated at all;
+  `wazuh-install-files.tar` only contains certs + `config.yml`.
 - Accounts: `admin` (dashboard), `wazuh-wui` (API)
 - Dashboard: HTTPS on port 443
 - API: Port 55000
@@ -216,9 +265,14 @@ terraform apply
 ```
 
 ### What Happens
-1. Terraform calls `/5.0/wazuh-install.sh` quickstart installer
-2. Script verifies URL returns HTTP 200
-3. Installation runs (~30 minutes)
+1. **Not** the baseline `terraform apply` alone — the baseline init scripts
+   target 4.x's `packages.wazuh.com` and will not deploy 5.0/5.0-beta
+   correctly. Write a test-specific `_override.tf` + init script that
+   downloads from the URLs in `artifact_urls_5.0.0-latest.yaml` (see
+   "Preferred Artifact Source" above and `terraform-override-tf-mechanism`
+   in the project memory).
+2. Script verifies each URL returns HTTP 200 before piping to bash (R2)
+3. Installation runs (~9-15 minutes for all-in-one, confirmed live)
 4. TTL enforcement activated (auto-terminates in configured time)
 5. Services start automatically
 
@@ -247,11 +301,12 @@ See [COMPARISON.md](COMPARISON.md) for detailed side-by-side comparison.
 
 ## Reference
 
-- **Wazuh 5.0 Docs**: https://docs.wazuh.com/
-- **Installation Guide**: [Link to be added]
-- **API Reference**: [Link to be added]
+- **Preferred artifact URLs (check first)**: [`artifact_urls_5.0.0-latest.yaml`](artifact_urls_5.0.0-latest.yaml)
+- **Wazuh 5.0-beta Docs**: https://documentation.wazuh.com/5.0-beta/
+- **Installation Guide**: https://documentation.wazuh.com/5.0-beta/installation-guide/
+- **API Reference**: https://documentation.wazuh.com/5.0-beta/user-manual/api/reference.html
 
 ---
 
-**Last Updated**: Phase 1 (2026-07-29)  
-**Phase Status**: 📋 IN PROGRESS — Awaiting Phase 2 research
+**Last Updated**: 2026-08-17 (live FIM documentation test)
+**Phase Status**: ✅ Sections above marked CONFIRMED are live-verified; sections still marked ⚠️ NEEDS VERIFICATION were out of scope for that test and remain research-only

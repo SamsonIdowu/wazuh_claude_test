@@ -62,6 +62,16 @@ Default TTL is 240 minutes and is **actually enforced** (a scheduled
 `main.tf`), not just a tag — extend it in `terraform.tfvars` if a test needs
 longer.
 
+**Testing 5.0.0 / 5.0-beta specifically?** The baseline init scripts above
+hardcode 4.x's `packages.wazuh.com` and don't apply — write a test-specific
+`_override.tf` + init script instead (see `test/deployments/wazuh_5_0_0/RUNBOOK.md`).
+**Before hardcoding any install URL or package version string for 5.0**,
+check `test/deployments/wazuh_5_0_0/artifact_urls_5.0.0-latest.yaml` first —
+confirmed live that guessing a version string (e.g. `5.0.0-beta4`) for a
+package install produces a URL/package that resolves but doesn't match what's
+actually installable, a failure mode that isn't obvious until the install
+step itself fails.
+
 ---
 
 ## Verification Rules (Non-Negotiable)

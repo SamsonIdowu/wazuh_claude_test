@@ -288,6 +288,7 @@ terraform refresh
 - `test/UPGRADE_TEST_TEMPLATE.md` — Framework for upgrade testing
 - `test/TTL_AND_AUTO_TERMINATION.md` — Cost control details
 - `test/deployments/*/RUNBOOK.md` — Version-specific procedures
+- `test/deployments/wazuh_5_0_0/artifact_urls_5.0.0-latest.yaml` — **Preferred source for any 5.0/5.0-beta package or installer URL.** Check this before hardcoding a version string (e.g. `5.0.0-beta4`) into an install command — a guessed version string can resolve to a working installer script that installs a *different* package version than the one named, which only surfaces as a failure at install time.
 - `test/Language and formatting style guide for technical writing _ Wazuh.md` — Authoritative Wazuh writing style guide; every document review (R3) is checked against this file
 
 ---
