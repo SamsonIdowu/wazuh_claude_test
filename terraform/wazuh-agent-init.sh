@@ -1,4 +1,4 @@
-#!/bin/bash
+${ttl_prologue}
 set -e
 
 echo "Starting Wazuh ${wazuh_version} Agent Installation..."
@@ -10,7 +10,27 @@ apt-get update -qq
 apt-get upgrade -y -qq > /dev/null 2>&1
 
 # Install dependencies
-apt-get install -y curl wget gnupg2 ca-certificates > /dev/null 2>&1
+apt-get install -y curl wget gnupg2 ca-certificates apt-transport-https > /dev/null 2>&1
+
+if [[ "${wazuh_version}" == *beta* ]]; then
+  # 5.0-beta lives on an internal staging domain under an "unstable" apt
+  # component, and enrollment requires WAZUH_REGISTRATION_PASSWORD - a
+  # password the manager only generates at its own install time (authd.pass),
+  # which Terraform has no way to know at plan time. So this only does the
+  # version-agnostic repo prep; the actual `apt-get install wazuh-agent` +
+  # enrollment is a live step run manually once the manager's password is
+  # readable. See documentation.wazuh.com/5.0-beta/installation-guide/
+  # wazuh-agent/wazuh-agent-package-linux.html.
+  curl -s https://packages-staging.xdrsiem.wazuh.info/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import - 2>&1 | grep -v "gpg:" || true
+  chmod 644 /usr/share/keyrings/wazuh.gpg
+  echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages-staging.xdrsiem.wazuh.info/pre-release/5.x/apt/ unstable main" > /etc/apt/sources.list.d/wazuh.list
+  apt-get update -qq
+  echo "AGENT_PREP_DONE=$(date -Is)" > /root/AGENT_PREP_DONE
+  echo "Manager: ${wazuh_server_ip} - run manually once the manager's authd.pass is known:" >> /root/AGENT_PREP_DONE
+  echo "WAZUH_MANAGER=${wazuh_server_ip} WAZUH_REGISTRATION_PASSWORD='<authd.pass>' apt-get install -y wazuh-agent" >> /root/AGENT_PREP_DONE
+  cat /root/AGENT_PREP_DONE
+  exit 0
+fi
 
 # Add Wazuh repository
 curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import - 2>&1 | grep -v "gpg:" || true

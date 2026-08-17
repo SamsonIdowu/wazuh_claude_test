@@ -65,19 +65,42 @@ resource "tls_private_key" "main" {
 }
 
 # Save private key locally
+#
+# file_permission = "0600" is a no-op on Windows: local_file only sets POSIX
+# mode bits, which Windows has none of. The real gate on Windows is the file's
+# ACL, which by default inherits from the parent folder - on this machine that
+# inheritance grants Full Control to SYSTEM, Administrators, AND an unrelated
+# "remote" account. OpenSSH's Windows client refuses to load a key if ANY
+# account other than the owner can read it, so every fresh `terraform apply`
+# produced a key ssh immediately rejected with "Bad permissions" /
+# "UNPROTECTED PRIVATE KEY FILE". The provisioner below strips inherited ACLs
+# and grants read-only access to the current user only, right after the key
+# is written, so this can't recur.
 resource "local_file" "private_key" {
   content         = tls_private_key.main.private_key_pem
   filename        = "${var.ssh_key_output_path}/wazuh-test-key.pem"
   file_permission = "0600"
+
+  provisioner "local-exec" {
+    interpreter = ["PowerShell", "-Command"]
+    command     = "icacls '${self.filename}' /inheritance:r /grant:r \"$($env:USERNAME):(R)\""
+  }
 }
 
 # AWS key pair
+# Named per-version: a key pair name is unique account+region-wide, so two
+# concurrent tests sharing this account collide on a fixed name (this, plus
+# identical fixed Name tags on the instances/SGs below, caused one session's
+# `terraform destroy`/cleanup to silently delete another session's
+# identically-named resources during PoC-guide testing on 2026-08-06).
+# key_name is ForceNew on aws_instance, so this does force every instance
+# referencing it to replace once - a one-time cost paid already in this run.
 resource "aws_key_pair" "main" {
-  key_name   = "wazuh-test-key"
+  key_name   = "wazuh-test-key-${var.wazuh_version}"
   public_key = tls_private_key.main.public_key_openssh
 
   tags = {
-    Name = "wazuh-test-key"
+    Name = "wazuh-test-key-${var.wazuh_version}"
   }
 }
 
@@ -136,7 +159,7 @@ EOT
 
 # Security Group for Wazuh Server
 resource "aws_security_group" "wazuh_server" {
-  name        = "wazuh-server-sg"
+  name        = "wazuh-server-sg-${var.wazuh_version}"
   description = "Security group for Wazuh server"
   vpc_id      = data.aws_vpc.default.id
 
@@ -220,13 +243,22 @@ resource "aws_security_group" "wazuh_server" {
   }
 
   tags = {
-    Name = "wazuh-server-sg"
+    Name = "wazuh-server-sg-${var.wazuh_version}"
+  }
+
+  # Other security groups reference this one by ID (e.g. the Windows victim
+  # endpoint's agent-comms rule). Without create_before_destroy, renaming
+  # this SG's `name` makes Terraform destroy-then-create, and the destroy
+  # fails with DependencyViolation because the referencing SG hasn't been
+  # updated yet - discovered while fixing the account-wide Name collision.
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
 # Security Group for the combined Wazuh agent + TheHive endpoint
 resource "aws_security_group" "wazuh_agent" {
-  name        = "wazuh-agent-sg"
+  name        = "wazuh-agent-sg-${var.wazuh_version}"
   description = "Security group for Wazuh agent + TheHive endpoint"
   vpc_id      = data.aws_vpc.default.id
 
@@ -361,7 +393,13 @@ resource "aws_instance" "wazuh_server" {
   }))
 
   tags = {
-    Name               = "wazuh-server"
+    # Suffixed with wazuh_version: a generic "wazuh-server" Name tag collides
+    # across concurrent tests sharing this AWS account. This repo's own
+    # documented cleanup commands (README.md, TTL_AND_AUTO_TERMINATION.md)
+    # filter EC2 by tag:Name, not by instance ID/state file, so one session's
+    # teardown silently terminates another session's identically-tagged
+    # instance too - this happened during PoC-guide testing on 2026-08-06.
+    Name               = "wazuh-server-${var.wazuh_version}"
     Purpose            = "Wazuh Server"
     TTL_Minutes        = var.resource_ttl_minutes
     AutoTermination    = var.enable_auto_termination
@@ -408,7 +446,7 @@ resource "aws_instance" "wazuh_agent" {
   }))
 
   tags = {
-    Name            = "wazuh-agent"
+    Name            = "wazuh-agent-${var.wazuh_version}"
     Purpose         = "Wazuh Agent"
     TTL_Minutes     = var.resource_ttl_minutes
     AutoTermination = var.enable_auto_termination
