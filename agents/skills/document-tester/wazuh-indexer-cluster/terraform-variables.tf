@@ -29,9 +29,14 @@ variable "allowed_api_cidrs" {
 }
 
 variable "resource_ttl_minutes" {
-  description = "Minutes before each host self-terminates. Baked into user_data, so changing it replaces every instance in this root — set it once, high."
+  description = "Minutes before each host self-terminates. Baked into user_data, so changing it replaces every instance in this root — set it once. Account policy caps this at 240 (4h); see the validation below."
   type        = number
-  default     = 600
+  default     = 240
+
+  validation {
+    condition     = var.resource_ttl_minutes > 0 && var.resource_ttl_minutes <= 240
+    error_message = "TTL must be between 1 and 240 minutes (4h account policy)."
+  }
 }
 
 variable "enable_auto_termination" {

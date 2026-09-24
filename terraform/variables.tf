@@ -61,11 +61,11 @@ variable "wazuh_version" {
 variable "resource_ttl_minutes" {
   description = "Time-to-live for resources in minutes. Resources auto-terminate after this time."
   type        = number
-  default     = 240  # 4 hour default
+  default     = 240 # 4 hour account policy cap
 
   validation {
-    condition     = var.resource_ttl_minutes > 0 && var.resource_ttl_minutes <= 1440
-    error_message = "TTL must be between 1 and 1440 minutes (1 day max)."
+    condition     = var.resource_ttl_minutes > 0 && var.resource_ttl_minutes <= 240
+    error_message = "TTL must be between 1 and 240 minutes (4h account policy)."
   }
 }
 
