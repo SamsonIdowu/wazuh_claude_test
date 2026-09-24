@@ -150,7 +150,11 @@ def main():
     lines = replace_key(lines, 'plugins.security.nodes_dn',
                         seq('plugins.security.nodes_dn', dns))
 
-    out = '\n'.join(lines)
+    # Trailing newline is not cosmetic: without it, a later
+    # `echo 'key: val' >> opensearch.yml` concatenates onto the last line of
+    # the final block, silently corrupting the seed_hosts / nodes_dn list
+    # instead of appending a key.
+    out = '\n'.join(lines) + '\n'
 
     if args.dry_run:
         sys.stdout.write(out)

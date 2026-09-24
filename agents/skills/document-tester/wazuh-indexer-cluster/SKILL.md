@@ -5,8 +5,8 @@ description: Stand up a real multi-node Wazuh 5.0 indexer cluster on AWS for doc
 
 # Wazuh indexer cluster test rig
 
-Four passes of the "Wazuh indexer cluster" document have needed the same
-infrastructure and hit the same traps. This is that rig, so pass five starts
+Seven passes of the "Wazuh indexer cluster" document have needed the same
+infrastructure and hit the same traps. This is that rig, so pass eight starts
 from something that works.
 
 ## Files
@@ -26,8 +26,11 @@ them, and separate state means no `-target` juggling and no risk to a concurrent
 test in the shared AWS account.
 
 ```bash
-terraform apply -auto-approve                          # 3 indexers + manager + dashboard + 2 AIO
-terraform apply -auto-approve -var="cluster_indexer_count=4"   # add a node, 1 to add / 0 to change
+# 3 indexers + manager + dashboard + 2 AIO
+terraform plan -out=tfplan && terraform apply tfplan
+
+# add a node — the plan must say "1 to add, 0 to change"
+terraform plan -var="cluster_indexer_count=4" -out=tfplan4 && terraform apply tfplan4
 ```
 
 `cluster_indexer_count` is a variable specifically so the add-a-node test does
@@ -79,6 +82,60 @@ file and asserts each key parses back to what was asked, exiting non-zero if not
   `openssl verify -CAfile` and a fingerprint comparison before touching a live
   cluster.
 
+## Reading the document (three exports, not two)
+
+Pull **all three** Drive exports. They disagree, and each one is the only source
+for something:
+
+```
+read_file_content                               -> markdown   (flattens table-cell code blocks)
+download_file_content exportMimeType=text/plain -> newlines + comment threads
+download_file_content exportMimeType=text/html  -> heading ids, bookmarks, NBSP
+```
+
+- The **plain-text** export arrives **base64-encoded** in `content` — decode it,
+  then strip CRLF. Markdown arrives as plain text in `fileContent`.
+- Markdown and plain text can differ when a suggested edit is unaccepted. Diff
+  them before reporting, or you review the wrong text.
+- Only the **HTML** export keeps `<h_ id="h.xxxx">` heading ids and `id.xxxx`
+  bookmark anchors. Cross-check every `#heading=`/`#bookmark=` link in the
+  markdown against the ids defined in the HTML — pass 6 found four dead links
+  that way, including the only route to the deployment script.
+- Only the HTML export preserves NBSP; the other two normalise it to a space. So
+  "0 NBSP" from markdown/plain text does **not** mean the doc is clean.
+
+Extract a script with `sed -n 'A,Bp'` and **check the last line is there** — an
+off-by-one drops the closing `fi` and you misreport a syntax error. This has now
+bitten two passes running.
+
+## Terraform, under the permission classifier
+
+`terraform apply -auto-approve` is refused as **"Blind Apply."** Use
+`terraform plan -out=tfplan` (read the summary, confirm `N to add, 0 to change`)
+then `terraform apply tfplan`. `init` and `apply` both need
+`dangerouslyDisableSandbox` — the registry and the AWS endpoints are otherwise
+unreachable.
+
+## Installing the all-in-one precondition
+
+The assistant still 403s on its default artifact URL
+(`packages.wazuh.com/production/5.x/artifact-urls/artifact_urls_5.0.0.yaml`,
+exit 22). `-a -i` is invalid — `-i` is not a flag. What works:
+
+```bash
+sudo bash wazuh-install-5.0.0-beta5.sh -a -id -d pre-release
+```
+
+## The heap is not optional
+
+A doc-built cluster runs `-Xms1g/-Xmx1g` whatever the host size, and stock
+`opensearch.yml` sets `indices.breaker.total.limit: 80%`. At 1 GB that is an
+819 MB breaker, and **shard recovery cannot complete**: stop and start one node
+and the cluster goes red with shards stuck `INITIALIZING` forever
+(`CircuitBreakingException [parent] Data too large`). Set the heap to ~half of
+RAM on every node *before* judging any resilience behaviour, or you will
+attribute a tuning failure to the procedure under test.
+
 ## Verification one-liners
 
 ```bash
@@ -98,3 +155,66 @@ sudo cat /root/TTL_SCHEDULED && sudo shutdown --show
 Health is **green on a single node too** — every Wazuh index carries
 `index.auto_expand_replicas: "0-1"`, so one node resolves to 0 replicas. Yellow
 on a single node is a real problem, not the expected state.
+
+## Traps found on pass 6
+
+- **The doc's own tuning step breaks startup.** `bootstrap.memory_lock: true` is
+  already in the shipped `opensearch.yml`; adding it as the doc says gives
+  `JsonParseException: Duplicate field` and the service will not start. Expect
+  it, prove it, then delete the duplicate line to get a cluster. Same story for
+  `LimitMEMLOCK=infinity`, already at line 57 of the packaged unit.
+- **Only the `wazuh` AWS profile has valid credentials** here. `default` and
+  `security` return `InvalidClientTokenId`, which looks like an expired session
+  rather than a wrong profile.
+- **The MCP/Playwright browser cannot open the dashboard** —
+  `ERR_CERT_AUTHORITY_INVALID`, no ignore-cert option. Verify Dev Tools
+  functionally instead: `POST /auth/login` for a session cookie, then
+  `POST /api/console/proxy?path=<path>&method=GET` with an `osd-xsrf` header.
+  That is the same endpoint the Dev Tools console itself calls.
+- **Installer filenames lie about the version.** `wazuh-install-5.0.0-beta5.sh`
+  downloads `wazuh-manager_5.0.0-beta5_amd64.deb`, but `dpkg -l` reports
+  `5.0.0-1` — the same build the apt repo serves. No skew; do not chase it.
+- **Judge a doc's shard/drain instructions against `_cat/shards` with no
+  filter.** `wazuh-*` matches only 26–36 of the 66 shards on a node; the rest are
+  `.opensearch-sap-*` and friends, 21 of which ship with **zero replicas**. This
+  is also why losing one node of three turns the cluster red.
+
+## Traps found on pass 7
+
+- **The Markdown export can drop a whole section.** Pass 7's *Removing a Wazuh
+  indexer node* — heading, six steps, five tables — was **entirely absent** from
+  `read_file_content`'s markdown but complete in the HTML export. The only clue
+  was a Contents entry whose anchor resolved fine while no matching heading
+  existed in the md. This is stronger than the known "md and plain text can
+  disagree": always reconcile the **Contents list against the headings found in
+  the HTML**, and extract any missing section's body from the HTML. Reporting
+  "this section is empty" off the markdown would have been a false critical.
+- **`.opendistro-alerting-*` cannot be modified over REST, by anyone.**
+  `plugins.security.system_indices.enabled: true` plus
+  `system_indices.indices` (which lists `.opendistro-alerting-config`) makes any
+  settings PUT matching it return
+  `security_exception ... User [name=admin, backend_roles=[admin]]`, HTTP 403 —
+  admin included. A multi-pattern PUT is **atomic**, so one protected index in
+  the list silently discards the whole request. Always isolate a failing
+  multi-pattern request one pattern at a time before attributing the cause.
+- **The installation assistant sizes the heap; the package does not.** An
+  installer-built all-in-one came up `-Xms1954m/-Xmx1954m` (~25% of RAM), not
+  `1g`. A sed like `s/^-Xms[0-9]*g/` silently matches nothing there — use
+  `-E 's/^-Xms[0-9]+[mg]/'`. Check the value after editing, never assume.
+- **Red after a node stops is not necessarily terminal.** With a correct heap,
+  `delayed_unassigned_shards` equals `unassigned_shards` for the first ~60s
+  (`node_left.delayed_timeout` is 1m), then recovery runs: 67% → 85% → 99.5%
+  over ~90s. Poll for at least 3 minutes and report the **stable** state; a
+  single reading at t+30s reports a transient as a permanent failure.
+- **The distributed add-node cert collision is path-specific.** It fires on an
+  existing indexer node (whose `/root/wazuh-certificates/` the main flow created)
+  and *not* on the all-in-one path, where `/root` is clean. Test both before
+  calling it universal.
+- **Console-proxy needs the query string encoded.** `POST /api/console/proxy?
+  path=_cat/allocation?v&h=node,shards` returns
+  `400 [request query.h]: definition for this key is missing` — that is the
+  harness, not the doc. Encode the inner `&` as `%26` and it returns 200. Re-run
+  encoded before reporting any console command as broken.
+- **Check the AWS key file, not chmod.** `chmod 600` on the terraform-written
+  `.pem` fails "Permission denied" on the Windows working tree; copy the key into
+  the scratchpad first, then chmod there.
