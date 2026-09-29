@@ -3,7 +3,7 @@ name: aws-service-tab-parity-test
 description: Test a "Monitoring AWS" service page (GuardDuty, KMS, Macie, WAF, Trusted Advisor, S3 server access, Inspector, CloudWatch Logs, ECR) against Wazuh 4.x and 5.0 at the same time, using one shared S3 bucket so every difference in the result is a version difference. Use when a doc page or tab claims a Wazuh rule fires for an AWS service.
 owner: document-tester
 created: 2026-09-24
-last-verified: 2026-09-25
+last-verified: 2026-09-29
 ---
 
 # AWS service tab parity test
@@ -108,7 +108,7 @@ exist. See `resolve-rule-ids.sh`.
 The AWS integration ships `enabled: false`. On a healthy install the Security
 Analytics plugin bootstraps about a minute after installation (it creates
 `.opensearch-sap-detectors-config`, one detector per integration and `-alerts`
-indices), and the enable works first time. On one install (2026-09-23) that
+indices), and the enable works first time. On 2 of 3 fresh installs (2026-09-23 and 2026-09-29) that
 bootstrap never ran — the enable failed with `no such index
 [.opensearch-sap-detectors-config]` and **no findings persisted for any source**.
 Check first; if detectors are missing the host is broken and no "no findings"
