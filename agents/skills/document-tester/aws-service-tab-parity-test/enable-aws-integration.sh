@@ -34,13 +34,14 @@ echo "id=$ID"
 # The Security Analytics backend needs this index to exist before it will accept an
 # integration update. On a fresh install nothing has created it yet, and the enable
 # fails with: no such index [.opensearch-sap-detectors-config]
-if ! curl -sk -u "$U:$P" "$IDX/.opensearch-sap-detectors-config" | grep -q detectors-config; then
+# Test the HTTP status, not the body: the 404 error body itself contains the index name.
+if [ "$(curl -sk -o /dev/null -w '%{http_code}' -u "$U:$P" "$IDX/.opensearch-sap-detectors-config")" != "200" ]; then
   echo "== creating missing .opensearch-sap-detectors-config =="
   curl -sk -u "$U:$P" -X PUT "$IDX/.opensearch-sap-detectors-config" \
     -H 'Content-Type: application/json' \
     -d '{"settings":{"index.hidden":true,"number_of_shards":1,"number_of_replicas":0}}'
   echo
-  sleep 3
+  sleep 15   # the new index needs a moment before the backend will use it
 fi
 
 echo "== building the update body from the current document =="
