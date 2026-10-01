@@ -21,3 +21,27 @@ Every agent reads this file plus its own `learning/lessons/<agent>.md` before st
 **What happened**: Beyond rule IDs, the same page's troubleshooting section is unrunnable on 5.0: the 5.0 manager has no `ossec.log`, no `logall_json`, no `archives/` directory, and its config is `/var/wazuh-manager/etc/wazuh-manager.conf`. Instructions that are correct-but-only-on-4.x are harder to spot than outright errors because they read as normal.
 **Lesson**: When a page is relabelled for 5.0, re-verify every filesystem path, config option and diagnostic command against a 5.0 install, not just the feature steps. `/var/ossec/...` paths on a 5.0 host belong to the **agent**; the manager lives under `/var/wazuh-manager/`.
 **Status**: open
+
+## 2026-09-29 — An integration that reads a state source and an event stream for the same finding can alert twice
+**Source**: downstream-catch
+**Task**: Monitoring Kyverno policy violations with Wazuh (blog review + test, 2026-09-29)
+**Reported by**: document-reviewer-2 (predicted), blogpost-tester (confirmed)
+**What happened**: The Kyverno collector turned each Audit finding into a report alert (101901/101911) and also into event alerts (101903) from both `kyverno-admission` and `kyverno-scan`. Every background re-scan wrote new Event objects with new UIDs, which defeated the UID-based de-duplication. 101903 made up 54 of 94 alerts.
+**Lesson**: When a post's integration reads both a state source (reports, inventories) and an event stream (Kubernetes events, audit logs) for the same finding, check whether the finding alerts twice and whether re-scans re-emit it. The screenshot's hit count is the quickest tell. De-duplicate on the finding's identity (policy, resource, result), not on the event object's UID.
+**Status**: open
+
+## 2026-09-29 — In 4.x a child rule doesn't inherit its parent's groups; FIM child rules need `syscheck`
+**Source**: self-observed
+**Task**: Monitoring Kyverno policy violations with Wazuh (blog review + test, 2026-09-29)
+**Reported by**: blogpost-tester
+**What happened**: Custom rule 101905 (`if_sid 550,553,554`) had the groups `kyverno, kubernetes, kyverno_policy_change` only, with no `syscheck`. Its alerts therefore don't match `rule.groups:syscheck`, the filter the File Integrity Monitoring module uses.
+**Lesson**: When writing or reviewing a custom child of a FIM (or any module) rule, include the module's group (for example `syscheck,`) in the child's `<group>`, or its alerts drop out of that module's dashboard.
+**Status**: open
+
+## 2026-09-30 — De-duplicate before you filter, or a later state change re-reads old events
+**Source**: self-observed
+**Task**: Monitoring Kyverno policy violations with Wazuh (revision recheck, 2026-09-30)
+**Reported by**: blogpost-tester
+**What happened**: The revised collector skipped Audit-policy admission events (`if mode != "enforce": continue`) before recording them in its seen-state. When the live policy switched to Deny, the same events (still inside Kubernetes' one-hour event lifetime) were read again and classified as rejections. That raised six level-10 "refused" alerts for running pods. Moving the state write above the filter fixed it (verified by replay).
+**Lesson**: In any polling collector a post ships, record an item as seen before any filter that depends on mutable live state (policy mode, config). Otherwise the same item is re-judged under the new state. When reviewing or testing one, include a state-change step (Audit→Deny, enable→disable) after items have been collected.
+**Status**: open

@@ -1,0 +1,135 @@
+# Words and phrases HEADING-CASE accepts capitalised mid-heading. One per line, exact case.
+# When a real product or UI label is flagged, add it here; don't silence the rule in code.
+# Wazuh capabilities and components that the style guide capitalises
+Wazuh
+Active Response
+Security Configuration Assessment
+Wazuh Cloud
+# Dashboard modules and UI labels that match appearance
+Threat Hunting
+File Integrity Monitoring
+Vulnerability Detection
+Configuration Assessment
+Discover
+Findings
+Security Events
+Server Management
+Endpoints Summary
+Log Test
+Dev Tools
+# Operating systems and platforms
+Linux
+Windows
+Windows Server
+macOS
+Ubuntu
+Debian
+CentOS
+Red Hat
+Red Hat Enterprise Linux
+RHEL
+Rocky Linux
+AlmaLinux
+Amazon Linux
+Fedora
+SUSE
+Kali
+Alpine
+Android
+iOS
+# Cloud and SaaS
+Amazon
+Amazon Web Services
+AWS
+Amazon S3
+Amazon EC2
+Amazon VPC
+Amazon Inspector
+Amazon Macie
+Amazon GuardDuty
+Amazon Security Lake
+CloudTrail
+CloudWatch
+GuardDuty
+AWS Config
+AWS WAF
+AWS KMS
+Azure
+Microsoft
+Microsoft 365
+Microsoft Defender
+Microsoft Entra ID
+Entra ID
+Office 365
+Google
+Google Cloud
+Google Workspace
+GitHub
+GitLab
+Slack
+Jira
+Okta
+Cloudflare
+# Security tools and projects
+Kubernetes
+Kyverno
+K3s
+Docker
+Docker Compose
+Podman
+Suricata
+Snort
+Zeek
+YARA
+Sysmon
+Osquery
+ClamAV
+VirusTotal
+MISP
+TheHive
+Shuffle
+Falco
+Trivy
+Terraform
+Ansible
+Puppet
+Chef
+Langflow
+DVWA
+MITRE
+MITRE ATT&CK
+ATT&CK
+CIS
+NIST
+OWASP
+PCI DSS
+HIPAA
+GDPR
+TSC
+# Software
+Apache
+NGINX
+Nginx
+MySQL
+PostgreSQL
+Redis
+Python
+PowerShell
+Bash
+Java
+Node.js
+OpenSSH
+OpenSSL
+Chrome
+Firefox
+Edge
+Elastic
+Elastic Stack
+Filebeat
+Logstash
+Grafana
+Prometheus
+Splunk
+Graylog
+Sigma
+Syslog

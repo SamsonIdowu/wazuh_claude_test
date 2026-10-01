@@ -18,4 +18,8 @@ Keep the feedback verbatim. Paraphrasing drops the part that mattered — the sp
 
 ---
 
-_No feedback recorded yet._
+## 2026-09-29 — Writer skills from the blogpost-format skill
+**From**: user
+**Concerns**: technical-writer-1, technical-writer-2
+**Feedback (verbatim)**: "instead of using this skill file, copy its contents and adapt it to my environment and use it to update existing skills for my writer agents so that they can review better."
+**Processed**: yes (2026-09-29, filed as skills technical-writer-1/self-check-sweep and technical-writer-2/google-doc-house-format; see learning/promoted-changelog.md)

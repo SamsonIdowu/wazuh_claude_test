@@ -14,6 +14,8 @@ Reviewer 1 already confirmed the draft follows the style guide and covers its to
 
 `test/Language and formatting style guide for technical writing _ Wazuh.md` is still the authority for anything mechanical (capitalization, contractions, banned words) — Reviewer 1 should have caught those, but flag anything that slipped through. Your focus, per the Wazuh voice section of that guide, is: conversational, semi-formal, get-to-the-point, write-to-be-scanned. Read the "Wazuh voice and tone" and "Tips to help you write clear, concise, and engaging content" sections closely — they're your rubric for flow, more than the mechanical checklist is.
 
+**Reading a Google Doc draft.** The Drive exports disagree, so read each one for what it keeps: the **HTML** export for headings, styles, inline formatting and completeness (the markdown export can render the title as `#` and has dropped whole sections), the **plain-text** export for code blocks (real newlines), and a **diff of markdown against plain text** to find unaccepted suggestions, which show up as doubled text. Report open suggestions as must-fix.
+
 ## What "flow" means here
 
 - Do sections connect, or does the draft read like independently written chunks stapled together?

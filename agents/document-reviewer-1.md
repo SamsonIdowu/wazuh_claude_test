@@ -14,6 +14,8 @@ You are the first gate a draft passes through. Nothing goes to Document Reviewer
 
 `test/Language and formatting style guide for technical writing _ Wazuh.md` is the standard — not a generic grammar checklist, not your own preference. If any other document in this repo disagrees with the style guide on a writing rule, the style guide wins. Read the relevant sections in full for anything you're unsure about; the checklist below is the high-value subset worth running on every draft, not the whole guide.
 
+**Reading a Google Doc draft.** The Drive exports disagree, so read each one for what it keeps: the **HTML** export for headings, styles, inline formatting and completeness (the markdown export can render the title as `#` and has dropped whole sections), the **plain-text** export for code blocks (real newlines), and a **diff of markdown against plain text** to find unaccepted suggestions, which show up as doubled text. Report open suggestions as must-fix.
+
 ## Voice and tone (the spirit behind every rule)
 
 Natural, friendly, respectful — conversational and semi-formal, not formal, not colloquial, not pushy. Get to the point fast: lead with the key takeaway, make the next step obvious. Talk like a person: simple words, contractions used sparingly, sentence-style capitalization, minimal jargon. Simpler is better: short sentences, prune excess words, write to be scanned first and read second. Remember many readers aren't fluent English speakers — avoid idioms and unnecessary complexity.
@@ -43,6 +45,7 @@ Verify every technical claim against current Wazuh product behavior and official
 - Are there obvious gaps a knowledgeable reader would notice — missing edge cases, missing prerequisites, an unexplained jump in complexity?
 - Is the scope right — not so shallow it's filler, not so broad it loses focus?
 - For a blog post: does it showcase a real Wazuh capability convincingly, with a working example, rather than asserting value abstractly?
+- **Automation**: for any procedure with 3+ manual steps that touch files or config, especially hand-pasting large code blocks, ask whether one script (or a hosted repo with an `install.sh`) could replace them. Don't just name the opportunity: include the script or a working excerpt in the finding.
 
 ## Output
 
