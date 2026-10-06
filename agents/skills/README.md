@@ -8,7 +8,7 @@ agents/skills/<agent>/<skill-name>/
 └── (scripts, templates, checklists the skill needs)
 ```
 
-Skills are permanent repo assets. This is deliberate: cleanup wipes `results/` and `test/terraform/` after every test run, so a verification script or a generated Terraform pattern worth keeping has to be promoted into a skill **before** cleanup, or it's gone. The tester agents lose the most to this, so they should be the quickest to propose skills.
+Skills are permanent repo assets. This is deliberate: cleanup wipes `results/` and `test/terraform/` after every test run, so a verification script worth keeping has to be promoted into a skill **before** cleanup, or it's gone. Terraform is the exception: it is never stored in a skill. The repo keeps Terraform only for the baseline Wazuh server and agent in `terraform/`; a skill describes any extra infrastructure in its `SKILL.md` instead, with addresses taken as variables that have no default. The tester agents lose the most to this, so they should be the quickest to propose skills.
 
 ## When something becomes a skill
 
@@ -60,7 +60,7 @@ Starting points, not a mandate — build the ones the work actually calls for.
 
 **document-tester** — `deploy-baseline-and-verify` (bring up a version, confirm all services with commands per R1) · `essential-procedure-sweep` (installation, service status, dashboard access, credential retrieval, API auth) · `audit-report-build` (assemble the Documentation Audit Report from a verification log) · `cleanup-verification` (destroy, wipe ephemerals, confirm with `git status --short`)
 
-**blogpost-tester** — `claim-extraction` (turn a post into a testable list of claims) · `custom-rule-deployment-test` (deploy a post's rules/decoders and prove the alert fires) · `external-integration-test` (API-dependent posts: security group generation plus reachability checks) · `generated-terraform-scaffold` (the `test/terraform/` pattern for post-specific infra)
+**blogpost-tester** — `claim-extraction` (turn a post into a testable list of claims) · `custom-rule-deployment-test` (deploy a post's rules/decoders and prove the alert fires) · `external-integration-test` (API-dependent posts: security group generation plus reachability checks) · `generated-terraform-scaffold` (how to write post-specific infra in `test/terraform/` — described in the `SKILL.md`, no `.tf` files)
 
 **document-reviewer-1** — `style-mechanical-sweep` (grep-based pass for banned words, deprecated terminology, possessives, rule-ID range) · `heading-hierarchy-audit` · `technical-claim-verification` (check claims against official docs, flag what needs a tester)
 

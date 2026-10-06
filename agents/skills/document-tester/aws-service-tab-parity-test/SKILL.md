@@ -186,16 +186,18 @@ Every documented rule ID must also be resolved against the shipped ruleset, and 
 Use this path when someone (Threat Intel, a dev request) needs **sample events per gap**, not only
 a verdict. It produced 45 matched gap events for wazuh/external-devel-requests#6858 in ~2.5 h.
 
-1. **Infra from `terraform-rc1/`** (copy into a worktree dir, `-var my_ip=$(curl -s checkip.amazonaws.com)`).
+1. **Infra**: write one Terraform root for the run in an ephemeral worktree dir (the repo keeps
+   Terraform only for the baseline server and agent in `terraform/`), and pass the tester IP at plan
+   time (`-var my_ip=$(curl -s checkip.amazonaws.com)`), never as a default.
    One root holds both hosts, the reader instance role (deliberately *no* EC2 write / `iam:CreateUser`,
    so it also generates the "without permissions" CloudTrail events), ALB+WAF, CLB, NLB (TLS listener,
    self-signed ACM cert), four Firehose streams, EventBridge rules and the three SQS subscriber queues.
    The shared log bucket, CloudTrail, VPC flow logs, Config, GuardDuty, Macie, Security Hub and
    Inspector are created by CLI (account-level). Put the RC1 `artifact_urls.yaml` next to `main.tf`
    **without its comment header**.
-2. **RC1 credentials are random** (`/etc/wazuh/credentials.env`, no more admin/admin). The v5
-   user_data installs root-only wrappers `idx` / `dash` / `wapi` that read that file themselves, and
-   enrols the agent through `POST /agents/insert/quick` at boot. Use `sudo idx …` live; never print the
+2. **RC1 credentials are random** (`/etc/wazuh/credentials.env`, no more admin/admin). Have the v5
+   user_data install root-only wrappers `idx` / `dash` / `wapi` that read that file themselves, and
+   enrol the agent through `POST /agents/insert/quick` at boot. Use `sudo idx …` live; never print the
    file or the installer summary (it echoes the generated admin password).
 3. **Enable** with `enable-integrations-rc1.sh` (all five integrations the doc lists), restart indexer
    then manager, wait for `[CM::Sync] Successfully synchronized space 'standard'`.

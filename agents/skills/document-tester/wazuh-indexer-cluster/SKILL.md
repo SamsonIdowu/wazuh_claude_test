@@ -13,13 +13,17 @@ from something that works.
 
 | File | What it is |
 |---|---|
-| `terraform-main.tf` | Provider, default-VPC lookup, its own SSH key, TTL prologue. Rename to `main.tf`. |
-| `terraform-topology.tf` | The hosts: N indexers + manager + dashboard + 2 all-in-one. Rename to `topology.tf`. |
-| `terraform-variables.tf` | Region, profile, CIDRs, TTL. Rename to `variables.tf`. |
 | `configure-indexer-node.py` | Sets the five cluster-identity keys in `opensearch.yml` in place, then verifies its own edit. |
 
-Copy the three `terraform-*.tf` files into an empty directory, drop the
-`terraform-` prefix, and `terraform init`. It is a **separate root** from the
+The repo keeps Terraform only for the baseline Wazuh server and agent in
+`terraform/`. Write this topology's Terraform for each run in an empty,
+ephemeral directory and delete it at cleanup. It needs: the provider,
+default-VPC lookup, its own SSH key, and the TTL prologue (copy the pattern from
+`terraform/main.tf`); a `cluster_indexer_count` variable driving N indexer
+hosts; plus one manager, one dashboard, and two all-in-one hosts. Take CIDRs
+as variables with no default, so no address is ever committed.
+
+Keep it a **separate root** from the
 repo's baseline `terraform/` on purpose — the baseline's outputs reference
 `aws_instance.wazuh_server` directly, so neutralising it with `count = 0` breaks
 them, and separate state means no `-target` juggling and no risk to a concurrent

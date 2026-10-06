@@ -80,3 +80,10 @@ This file is what makes self-improvement reviewable: you can see what each agent
 **Skill purpose**: Extends the parity test to a full 4.x vs 5.0 regression run that hands another team per-gap sample events. One Terraform root builds both hosts plus every AWS source; boot-time enrolment and root-only credential wrappers handle RC1's random credentials; the target extractor pairs both versions on the identical raw record; the bundle builder redacts and keeps the zip under GitHub's attachment limit.
 **Driven by**: user request 2026-10-01 (external-devel-requests#6858, RC1 artifacts); third use of the skill
 **User consulted**: not required
+
+## 2026-10-06 — blogpost-tester, document-tester — no Terraform in skills
+**Type**: instruction
+**Changed**: agents/blogpost-tester.md, agents/document-tester.md, agents/skills/README.md (skill-promotion guidance); removed every `.tf`/`.tpl` file from agents/skills/ (blogpost-tester/windows-privesc-endpoint, document-tester/wazuh-indexer-cluster, document-tester/aws-service-tab-parity-test/terraform-rc1/) and rewrote those three SKILL.md files to describe the infrastructure in prose
+**Rule**: The repo keeps Terraform only for the baseline Wazuh server and agent in `terraform/`. Skills describe extra infrastructure in their `SKILL.md`, take addresses as variables with no default, and never commit an IP. A committed default had leaked the tester's public IP.
+**Driven by**: user feedback 2026-10-06 (standing rule)
+**User consulted**: yes (the user's own instruction)

@@ -15,13 +15,24 @@ firing.
 
 | File | What it is |
 |---|---|
-| `windows-privesc-endpoint.tf` | Windows Server 2022 instance, its SG, AMI lookup, outputs. Drop into `terraform/` as-is — it **adds** resources, so a plain `terraform apply` picks it up. |
 | `windows-agent-init.ps1` | `user_data`. Waits for the manager's port 1515, installs the agent MSI, self-heals enrollment via `agent-auth.exe`. |
-| `ssm-ttl-access.tf` | IAM role + instance profile so SSM can reach every host. Not optional — see TTL below. |
-| `ssm_profile_override.tf` | Attaches that profile to the two instances declared in `main.tf`. Separate file because Terraform treats **every** block in a `*_override.tf` as an override, so the IAM resources cannot live there. |
 
-Set `wazuh_version` and `allowed_rdp_cidrs` in `terraform.tfvars`, then
-`terraform apply`. Remove all four files at cleanup.
+The repo keeps Terraform only for the baseline Wazuh server and agent in
+`terraform/`. Write the Windows host's Terraform for each run, in the
+ephemeral test directory, and delete it at cleanup. It needs:
+
+- A Windows Server 2022 instance (AMI lookup: `owners=amazon`,
+  `Windows_Server-2022-English-Full-Base-*`) with `windows-agent-init.ps1` as
+  `user_data` and `user_data_replace_on_change = true`.
+- Its own security group: RDP/WinRM from an `allowed_rdp_cidrs` variable with
+  **no default**, so the tester's /32 is supplied at plan time and never
+  committed.
+- An IAM role and instance profile with `AmazonSSMManagedInstanceCore`, attached
+  to every host in the run, including the baseline manager and agent. Not
+  optional — see TTL below. Attach it to the baseline instances through a
+  `*_override.tf` file that holds **only** the `iam_instance_profile`
+  overrides; Terraform treats every block in an override file as an override,
+  so the IAM resources must live in a separate file.
 
 ## There is no Windows 11 AMI on EC2
 
@@ -44,7 +55,7 @@ deadline, and `pam_nologin` then rejects **every** ssh login — including
 channel the timer has already closed. Two Linux hosts were lost this way.
 
 SSM Run Command does not go through PAM, so it still reaches the box. That is
-why `ssm-ttl-access.tf` is not optional. Re-arm with:
+why the SSM instance profile is not optional. Re-arm with:
 
 ```bash
 aws ssm send-command --profile wazuh --region us-east-1 --instance-ids <id> \
@@ -66,12 +77,12 @@ to keep.
 - **`user_data` does not force replacement by default.** Rebuilding the manager
   gives it a new private IP, so the Windows `user_data` changes — but Terraform
   reports an in-place `update` and the running agent stays pointed at the dead
-  manager. `user_data_replace_on_change = true` is already set in the .tf for
-  this reason.
+  manager. Always set `user_data_replace_on_change = true` on the Windows
+  instance for this reason.
 - **No `0.0.0.0/0` on RDP.** The permission classifier blocks it as
   `[Security Weaken]`, in a `.tf` file just as much as in a live command.
-  Default `allowed_rdp_cidrs` to the tester's own address:
-  `curl -s https://checkip.amazonaws.com`.
+  Pass the tester's own address at plan time, never as a committed default:
+  `-var 'allowed_rdp_cidrs=["'"$(curl -s https://checkip.amazonaws.com)"'/32"]'`.
 - **WinRM over HTTPS works; `Start-Process -Credential` does not.** The latter
   needs an interactive logon and fails `Access is denied` under WinRM. Connect
   with `New-PSSessionOption -SkipCACheck -SkipCNCheck` (the listener cert is
