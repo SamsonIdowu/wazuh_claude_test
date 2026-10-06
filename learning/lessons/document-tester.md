@@ -12,6 +12,7 @@ Keep this file short and current: one lesson per recurring pattern, not one per 
 **Reported by**: user
 **What happened**: The test was reported per-tab against 5.0 only until the user said mid-run: "Your test should be a comparism of 4.x and 5.0 for each test in the listed tabs." The doc is titled v5.0 and links the 5.0-beta manual, but every use case cites 4.x numeric rule IDs. A single-version run cannot separate "the doc is wrong" from "the ruleset dropped this" — on 5.0 alone, Macie, WAF and S3-server-access all look identically broken, when in fact one is a missing decoder, one is a mis-parented decoder, and one is missing rules.
 **Lesson**: When a doc's version label and its cited rule IDs disagree, deploy both versions and drive them from one shared data source, so every difference is attributable to the version. Report per-tab as a side-by-side, not as a single verdict with version caveats. Say so in the plan before starting, not after.
+**Recurrence**: 2 (2026-10-01: the user asked for the 4.x vs 5.0 comparison up front, as "regression testing", for the RC1 rerun)
 **Status**: open
 
 ## 2026-09-24 — Never report a ruleset gap from an empty findings index alone
@@ -52,4 +53,12 @@ Keep this file short and current: one lesson per recurring pattern, not one per 
 **Reported by**: document-tester
 **What happened**: A sweep of 105 external URLs returned `000` for every single one, twice, which looked like a total outage. The URL list had been written by Windows Python and copied to Linux, so every entry carried a trailing `\r` and curl never resolved anything. After `sed -i 's/\r$//'`, five genuine failures surfaced — including both AWS reference links in the Inspector tab and an internal `documentation-dev.wazuh.com` link leaked into three tabs.
 **Lesson**: A link sweep where *everything* fails is a harness bug, not a finding — strip `\r` and re-run before reporting. Always run the sweep from a host with unrestricted egress, and always include it: dead links to the vendor's own docs are among the cheapest real findings available.
+**Status**: open
+
+## 2026-10-01 — Sample events for another team: pair them on identical bytes
+**Source**: self-observed
+**Task**: Monitoring AWS v5.0 — RC1 regression run for external-devel-requests#6858
+**Reported by**: document-tester
+**What happened**: The first extraction picked "the first matching event" on each host separately, so a 4.x alert and a 5.0 event for the same gap were often two different records (a denied RunInstances on 4.x was an earlier `InvalidParameterValue`, not the permission denial). Re-running the 5.0 side keyed on the 4.x record's exact `event.original` bytes paired 43 of 45 gap events with the identical record.
+**Lesson**: When a sample is meant to show "same input, different result", extract it on one version first and look the other version's copy up by its exact raw bytes. Never select independently per version with the same predicate. `aws-service-tab-parity-test/targets.py` does this.
 **Status**: open

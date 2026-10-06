@@ -3,7 +3,7 @@ name: aws-service-tab-parity-test
 description: Test a "Monitoring AWS" service page (GuardDuty, KMS, Macie, WAF, Trusted Advisor, S3 server access, Inspector, CloudWatch Logs, ECR) against Wazuh 4.x and 5.0 at the same time, using one shared S3 bucket so every difference in the result is a version difference. Use when a doc page or tab claims a Wazuh rule fires for an AWS service.
 owner: document-tester
 created: 2026-09-24
-last-verified: 2026-09-29
+last-verified: 2026-10-01
 ---
 
 # AWS service tab parity test
@@ -181,6 +181,45 @@ The test is complete when, for each service, you can state all four with a comma
 Every documented rule ID must also be resolved against the shipped ruleset, and a
 "NOT PRESENT" result reported as a finding rather than silently skipped.
 
+## Full regression run with sample events (5.0 RC1, 2026-10-01)
+
+Use this path when someone (Threat Intel, a dev request) needs **sample events per gap**, not only
+a verdict. It produced 45 matched gap events for wazuh/external-devel-requests#6858 in ~2.5 h.
+
+1. **Infra from `terraform-rc1/`** (copy into a worktree dir, `-var my_ip=$(curl -s checkip.amazonaws.com)`).
+   One root holds both hosts, the reader instance role (deliberately *no* EC2 write / `iam:CreateUser`,
+   so it also generates the "without permissions" CloudTrail events), ALB+WAF, CLB, NLB (TLS listener,
+   self-signed ACM cert), four Firehose streams, EventBridge rules and the three SQS subscriber queues.
+   The shared log bucket, CloudTrail, VPC flow logs, Config, GuardDuty, Macie, Security Hub and
+   Inspector are created by CLI (account-level). Put the RC1 `artifact_urls.yaml` next to `main.tf`
+   **without its comment header**.
+2. **RC1 credentials are random** (`/etc/wazuh/credentials.env`, no more admin/admin). The v5
+   user_data installs root-only wrappers `idx` / `dash` / `wapi` that read that file themselves, and
+   enrols the agent through `POST /agents/insert/quick` at boot. Use `sudo idx …` live; never print the
+   file or the installer summary (it echoes the generated admin password).
+3. **Enable** with `enable-integrations-rc1.sh` (all five integrations the doc lists), restart indexer
+   then manager, wait for `[CM::Sync] Successfully synchronized space 'standard'`.
+4. **Collect** with `collect-all.sh .` on the 4.x host first, then the 5.0 host. SQS subscribers delete
+   what they read: re-notify between hosts with an in-place `aws s3 cp … --metadata-directive REPLACE`.
+   The Security Lake subscriber **requires** `-i <role> -x <external-id>` (exit 21 without).
+5. **Evidence**: `v4-evidence.py` / `v5-evidence.py` per service; `targets.py v4 <dir>`, then copy the
+   4.x `*/raw.txt` to the 5.0 host and run `targets.py v5 <dir> <4x-raws-dir>` so every pair is the
+   **identical record** (join on `event.original` bytes). `coverage.py` gives per-type GuardDuty and
+   Security Hub coverage. `build-sample-bundle.py` redacts and packages (it refuses to run until
+   `REDACT_TESTER_IP`, `REDACT_HOST_IPS` and `REDACT_IAM_USER` are set for the run); keep only logtest replays
+   under integrations that evaluate rules or the zip blows past GitHub's 25 MB.
+
+RC1 facts this established (see the report for evidence):
+- Decoders parented to `core-wazuh-message` (`aws-vpcflow`, `aws-elb-logs`, `aws-waf`,
+  `aws-cloudwatch`) test the raw wire format and can never match the module's `{"integration":"aws",…}`
+  envelope. Working ones (`aws-cloudtrail`, `-guardduty`, `-inspector`, `-s3access`,
+  `-securityhub-findings`) are parented to `decoder/aws/0`.
+- CloudWatch messages that are not syslog and lack `msg`+`level` hit `filter/DiscardedEvents` and are
+  never indexed (`index_discarded_events: false`) — this is the whole ECR "visibility" gap.
+- Rules only see events of their own integration: `wazuh-generic-1` auth rules whose selection the
+  normalized event satisfies still produce nothing for `aws` / `system-auth` events.
+- Origin marker for AWS-module events in v5 docs: `wazuh.protocol.location == "Wazuh-AWS"`.
+
 ## Known failure modes
 
 - **`wazuh-control restart` kills the agent permanently.** Always `systemctl restart`.
@@ -198,6 +237,18 @@ Every documented rule ID must also be resolved against the shipped ruleset, and 
 - **On 5.0 the manager ships no `wodles/aws` at all** — an agent on the manager host is
   genuinely required. On 4.x the manager already has it and installing an agent is
   destructive (`apt-get install -s wazuh-agent` proposes `Remv wazuh-manager`).
+- **RC1 installer vs APT lock.** On a fresh Ubuntu boot the dashboard step can hit the dpkg lock:
+  it prints `retry (1/10)` but fails after one retry, the rollback hits the same lock, and an orphaned
+  manager keeps 1515/1516/55000. `-o` then aborts on those ports. Recover: kill `pgrep -f
+  "wazuh-manager[-/]"`, stub `/var/lib/dpkg/info/wazuh-manager.{prerm,postrm}` with `exit 0`, purge,
+  `rm -rf /var/wazuh-manager /etc/wazuh*`, reinstall once no `fuser /var/lib/dpkg/lock-frontend`.
+  Never `pkill -f <script path>` over SSH — it matches the SSH command line and kills the session.
+- **Inspector `regions` duplicates findings.** Each region in `<regions>` re-fetches the same
+  findings (1,778 → 3,556 events). Count distinct `findingArn`, not events.
+- **GuardDuty sample findings created right after the publishing destination may never export.**
+  Run `create-sample-findings` again; the export then lands within ~5 min.
+- **4.x alerts on JSON-decoded events have no `full_log`.** Join alerts to archives on the decoded
+  `data` object, and classify events without `data.aws` (CloudWatch, ECR, Security Lake) by content.
 - **The 5.0 manager has no `ossec.log`, no `logall_json`, no `archives/`.** Its config is
   `/var/wazuh-manager/etc/wazuh-manager.conf`. Doc troubleshooting steps that use those
   paths are 4.x-only; the agent's `/var/ossec/logs/ossec.log` is where the wodle logs.
@@ -210,7 +261,8 @@ of them and verify each is gone by name:
 EC2 + SGs + key pair · ALB (disassociate the web ACL first) · WAFv2 web ACL and its
 logging configuration · Firehose streams · EventBridge rules (remove targets first) ·
 CloudTrail trail (stop logging first) · GuardDuty publishing destination then detector ·
-Macie session · ECR repository · CloudFormation stack · CloudWatch log groups (including
+Macie session · Security Hub (`disable-security-hub`) · Inspector (`inspector2 disable`) · Config
+(stop recorder, delete delivery channel, delete recorder) · VPC flow log · ECR repository · CloudFormation stack · CloudWatch log groups (including
 `/aws/lambda/*` the stack created) · S3 bucket (disable access logging, then empty) ·
 IAM policies (delete non-default versions first), roles, instance profiles, user, group ·
 KMS keys (`schedule-key-deletion`, 7-day minimum — they will show as `PendingDeletion`,

@@ -23,3 +23,9 @@ Keep the feedback verbatim. Paraphrasing drops the part that mattered — the sp
 **Concerns**: technical-writer-1, technical-writer-2
 **Feedback (verbatim)**: "instead of using this skill file, copy its contents and adapt it to my environment and use it to update existing skills for my writer agents so that they can review better."
 **Processed**: yes (2026-09-29, filed as skills technical-writer-1/self-check-sweep and technical-writer-2/google-doc-house-format; see learning/promoted-changelog.md)
+
+## 2026-10-01 — Monitoring AWS v5.0, RC1 regression run for external-devel-requests#6858
+**From**: user
+**Concerns**: document-tester, security-manager
+**Feedback (verbatim)**: "Extract sample logs from the servers for every test done and provide them in the report to satisfy this issue: https://github.com/wazuh/external-devel-requests/issues/6858 Use the RC1 attached artifacts. Ensure to compare 4x against 5.0 just to see the missing detections from 4.x to 5.0 and the log events that shows it. More like Regression testing."
+**Processed**: yes (2026-10-01, retrospective: learning/retrospectives/2026-10-01-aws-rc1-regression.md)

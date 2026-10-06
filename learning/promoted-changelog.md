@@ -73,3 +73,10 @@ This file is what makes self-improvement reviewable: you can see what each agent
 **Skill purpose**: No change in purpose. On the first reuse, the dashboard capture's single search-bar lookup ran before the Threat Hunting page had rendered it, so the query wasn't typed (509 unfiltered hits). The script now waits up to 60 s for `[data-test-subj="queryInput"]`. `setup-endpoint.sh` ran unchanged on a fresh deployment.
 **Driven by**: Kyverno blog recheck 2026-09-30 (second use of both skills)
 **User consulted**: not required
+
+## 2026-10-01 — document-tester — aws-service-tab-parity-test (extended)
+**Type**: skill
+**Changed**: agents/skills/document-tester/aws-service-tab-parity-test/SKILL.md (new "Full regression run with sample events" section, five new failure modes, cleanup list), terraform-rc1/ (main.tf, user_data_v4.sh.tpl, user_data_v5.sh.tpl), collect-all.sh, targets.py, coverage.py, v4-evidence.py, v5-evidence.py, enable-integrations-rc1.sh, build-sample-bundle.py
+**Skill purpose**: Extends the parity test to a full 4.x vs 5.0 regression run that hands another team per-gap sample events. One Terraform root builds both hosts plus every AWS source; boot-time enrolment and root-only credential wrappers handle RC1's random credentials; the target extractor pairs both versions on the identical raw record; the bundle builder redacts and keeps the zip under GitHub's attachment limit.
+**Driven by**: user request 2026-10-01 (external-devel-requests#6858, RC1 artifacts); third use of the skill
+**User consulted**: not required

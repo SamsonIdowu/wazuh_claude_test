@@ -45,3 +45,11 @@ Every agent reads this file plus its own `learning/lessons/<agent>.md` before st
 **What happened**: The revised collector skipped Audit-policy admission events (`if mode != "enforce": continue`) before recording them in its seen-state. When the live policy switched to Deny, the same events (still inside Kubernetes' one-hour event lifetime) were read again and classified as rejections. That raised six level-10 "refused" alerts for running pods. Moving the state write above the filter fixed it (verified by replay).
 **Lesson**: In any polling collector a post ships, record an item as seen before any filter that depends on mutable live state (policy mode, config). Otherwise the same item is re-judged under the new state. When reviewing or testing one, include a state-change step (Audit→Deny, enable→disable) after items have been collected.
 **Status**: open
+
+## 2026-10-01 — In 5.0 a rule that matches on paper can still never fire
+**Source**: self-observed
+**Task**: Monitoring AWS v5.0 — RC1 regression run for external-devel-requests#6858
+**Reported by**: document-tester
+**What happened**: A console-login failure (integration `aws`) and an sshd failure (integration `system-auth`) both carried exactly the fields `wazuh-generic-1` "Failed authentication attempt" selects, and neither produced a finding. Rules are evaluated against events of their own integration only. Separately, four AWS decoders (`aws-vpcflow`, `aws-elb-logs`, `aws-waf`, `aws-cloudwatch`) look correct in isolation but sit under the wrong parent and can never see the module's event shape.
+**Lesson**: When writing, reviewing or testing a 5.0 detection claim, don't infer coverage from a rule's selection or a decoder's check. Prove it with a finding in `wazuh-findings-v5-*` (or logtest scoped to the event's own integration), and check a decoder's `parents` as well as its `check`.
+**Status**: open
